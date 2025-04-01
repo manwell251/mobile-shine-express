@@ -18,7 +18,7 @@ const CallToAction = () => {
             </Button>
           </Link>
           <Link to="/contact">
-            <Button variant="outline" className="border-white text-white hover:bg-white/10 text-lg px-8 py-3 rounded-full">
+            <Button variant="outline" className="border-white text-white hover:bg-white hover:text-brand-blue text-lg px-8 py-3 rounded-full transition-colors">
               Contact Us
             </Button>
           </Link>

@@ -1,20 +1,44 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Phone } from 'lucide-react';
 
 const Hero = () => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  const backgroundImages = [
+    "https://images.unsplash.com/photo-1520340356584-0248e45c7c98?auto=format&fit=crop&q=80&w=2069",
+    "https://images.unsplash.com/photo-1605723517503-3cadb5818a0c?auto=format&fit=crop&q=80&w=2069",
+    "https://images.unsplash.com/photo-1600706002115-514a88aab33f?auto=format&fit=crop&q=80&w=2069",
+    "https://images.unsplash.com/photo-1607350412986-a40d93f2e448?auto=format&fit=crop&q=80&w=2069"
+  ];
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex === backgroundImages.length - 1 ? 0 : prevIndex + 1
+      );
+    }, 5000); // Change image every 5 seconds
+
+    return () => clearInterval(intervalId);
+  }, [backgroundImages.length]);
+
   return (
     <div className="relative">
-      {/* Hero Image */}
+      {/* Hero Images with Transition */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div className="bg-black/40 absolute inset-0 z-10"></div>
-        <img 
-          src="https://images.unsplash.com/photo-1520340356584-0248e45c7c98?auto=format&fit=crop&q=80&w=2069" 
-          alt="Car being detailed" 
-          className="w-full h-full object-cover"
-        />
+        {backgroundImages.map((image, index) => (
+          <img 
+            key={index}
+            src={image} 
+            alt={`Car detailing image ${index + 1}`}
+            className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-4000 ease-in-out ${
+              index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        ))}
       </div>
 
       {/* Hero Content */}
