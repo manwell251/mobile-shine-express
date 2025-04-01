@@ -25,7 +25,7 @@ const About = () => {
     {
       icon: <Heart size={36} className="text-brand-blue" />,
       title: 'Reliability',
-      description: 'We're punctual, professional, and committed to getting the job done right the first time.'
+      description: "We're punctual, professional, and committed to getting the job done right the first time."
     }
   ];
 
