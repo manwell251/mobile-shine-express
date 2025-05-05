@@ -15,6 +15,7 @@ import Jobs from './pages/admin/Jobs';
 import Customers from './pages/admin/Customers';
 import Settings from './pages/admin/Settings';
 import AdminLogin from './pages/admin/Login';
+import Accounting from './pages/admin/Accounting';
 import { Toaster } from './components/ui/toaster';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
           <Route path="bookings" element={<Bookings />} />
           <Route path="jobs" element={<Jobs />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="accounting" element={<Accounting />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 

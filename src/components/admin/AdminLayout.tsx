@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LogOut, Settings, Calendar, Clipboard, BarChart3, Users } from 'lucide-react';
+import { LogOut, Settings, Calendar, Clipboard, BarChart3, Users, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const AdminLayout = () => {
@@ -17,6 +17,7 @@ const AdminLayout = () => {
     { path: '/admin/bookings', label: 'Bookings', icon: <Calendar size={20} /> },
     { path: '/admin/customers', label: 'Customers', icon: <Users size={20} /> },
     { path: '/admin/jobs', label: 'Jobs', icon: <Clipboard size={20} /> },
+    { path: '/admin/accounting', label: 'Accounting', icon: <DollarSign size={20} /> },
     { path: '/admin/settings', label: 'Settings', icon: <Settings size={20} /> },
   ];
 

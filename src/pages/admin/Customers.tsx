@@ -7,7 +7,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Search, User, Phone, Mail, Calendar, MapPin } from 'lucide-react';
+import { Search, User, Phone, Mail, Calendar, MapPin, Download, Plus, FileSpreadsheet } from 'lucide-react';
 
 interface Customer {
   id: string;
@@ -78,14 +78,25 @@ const Customers = () => {
     );
   });
 
+  const handleExportToExcel = () => {
+    console.log('Exporting customer data to Excel...');
+    // In a real app, this would connect to a backend API to generate and download an Excel file
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Customers</h1>
-        <Button className="mt-4 md:mt-0">
-          <User className="mr-2" size={18} />
-          Add New Customer
-        </Button>
+        <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
+          <Button>
+            <User className="mr-2" size={18} />
+            Add New Customer
+          </Button>
+          <Button variant="outline" onClick={handleExportToExcel}>
+            <FileSpreadsheet className="mr-2" size={18} />
+            Export to Excel
+          </Button>
+        </div>
       </div>
 
       {/* Search and Stats */}
