@@ -1,27 +1,11 @@
 
 import React, { useState } from 'react';
-import { 
-  Table, TableBody, TableCell, TableHead, 
-  TableHeader, TableRow 
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { Search, Filter, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-// Job types
-interface Job {
-  id: string;
-  bookingId: string;
-  customerName: string;
-  services: string[];
-  date: string;
-  status: 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled';
-  amount: string;
-  technician: string;
-  location: string;
-}
+import { Button } from '@/components/ui/button';
+import { Job } from '@/types/job';
+import JobsFilterBar from '@/components/admin/jobs/JobsFilterBar';
+import JobsStatusFilter from '@/components/admin/jobs/JobsStatusFilter';
+import JobsTable from '@/components/admin/jobs/JobsTable';
 
 const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -64,16 +48,6 @@ const Jobs = () => {
     }
   ];
 
-  const getStatusClass = (status: string) => {
-    switch(status) {
-      case 'Scheduled': return 'bg-blue-100 text-blue-700';
-      case 'InProgress': return 'bg-amber-100 text-amber-700';
-      case 'Completed': return 'bg-green-100 text-green-700';
-      case 'Cancelled': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
-
   // Filter jobs
   const filteredJobs = jobs.filter(job => {
     return (statusFilter === 'all' || job.status === statusFilter) &&
@@ -106,117 +80,13 @@ const Jobs = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-grow">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-          <Input 
-            placeholder="Search jobs..." 
-            className="pl-10"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
-            className="flex items-center"
-          >
-            <Filter size={16} className="mr-2" />
-            Filters
-            <ChevronDown size={16} className="ml-2" />
-          </Button>
-          <Button variant="outline" className="flex items-center">
-            <CalendarIcon size={16} className="mr-2" />
-            Date Range
-            <ChevronDown size={16} className="ml-2" />
-          </Button>
-        </div>
-      </div>
+      <JobsFilterBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
       {/* Status quick filters */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Button 
-          variant={statusFilter === 'all' ? "default" : "ghost"} 
-          onClick={() => setStatusFilter('all')}
-          className="text-sm h-8"
-        >
-          All Jobs
-        </Button>
-        <Button 
-          variant={statusFilter === 'Scheduled' ? "default" : "ghost"} 
-          onClick={() => setStatusFilter('Scheduled')}
-          className="text-sm h-8"
-        >
-          Scheduled
-        </Button>
-        <Button 
-          variant={statusFilter === 'InProgress' ? "default" : "ghost"} 
-          onClick={() => setStatusFilter('InProgress')}
-          className="text-sm h-8"
-        >
-          In Progress
-        </Button>
-        <Button 
-          variant={statusFilter === 'Completed' ? "default" : "ghost"} 
-          onClick={() => setStatusFilter('Completed')}
-          className="text-sm h-8"
-        >
-          Completed
-        </Button>
-      </div>
+      <JobsStatusFilter statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
 
       {/* Jobs Table */}
-      <Card>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Job ID</TableHead>
-                <TableHead>Booking ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Services</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Technician</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredJobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-medium">{job.id}</TableCell>
-                  <TableCell>{job.bookingId}</TableCell>
-                  <TableCell>{job.customerName}</TableCell>
-                  <TableCell>
-                    {job.services.map((service, idx) => (
-                      <div key={idx} className="text-sm">{service}</div>
-                    ))}
-                  </TableCell>
-                  <TableCell>{job.date}</TableCell>
-                  <TableCell>{job.technician}</TableCell>
-                  <TableCell>
-                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusClass(job.status)}`}>
-                      {job.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>{job.amount}</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm">
-                        Update Status
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        View
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      <JobsTable jobs={filteredJobs} />
     </div>
   );
 };
