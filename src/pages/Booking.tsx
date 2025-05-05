@@ -5,6 +5,7 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { CalendarIcon, Clock, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type ServiceOption = {
   id: string;
@@ -32,8 +33,31 @@ const timeSlots = [
 const Booking = () => {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedService, setSelectedService] = useState<string>("");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   
+  const handleServiceToggle = (serviceId: string) => {
+    setSelectedServices(prev => 
+      prev.includes(serviceId) 
+        ? prev.filter(id => id !== serviceId)
+        : [...prev, serviceId]
+    );
+  };
+
+  // Calculate total price
+  const calculateTotal = () => {
+    return services
+      .filter(service => selectedServices.includes(service.id))
+      .reduce((total, service) => {
+        const price = parseInt(service.price.replace(/\D/g, ''));
+        return total + price;
+      }, 0);
+  };
+
+  const formattedTotal = () => {
+    const total = calculateTotal();
+    return `UGX ${total.toLocaleString()}`;
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
@@ -45,7 +69,7 @@ const Booking = () => {
     // Reset form
     e.currentTarget.reset();
     setSelectedDate("");
-    setSelectedService("");
+    setSelectedServices([]);
   };
 
   return (
@@ -160,27 +184,33 @@ const Booking = () => {
               
               {/* Service Selection */}
               <div>
-                <h3 className="text-xl font-bold mb-4">Select Service</h3>
+                <h3 className="text-xl font-bold mb-4">Select Services</h3>
+                <p className="text-gray-600 mb-4">Choose one or more services for your vehicle:</p>
                 <div className="grid grid-cols-1 gap-4">
                   {services.map((service) => (
-                    <div key={service.id} className="flex items-center">
-                      <input 
-                        type="radio" 
-                        id={service.id} 
-                        name="service"
-                        value={service.id}
-                        required
-                        checked={selectedService === service.id}
-                        onChange={() => setSelectedService(service.id)}
-                        className="mr-3 h-5 w-5 text-brand-blue focus:ring-brand-blue" 
-                      />
-                      <label htmlFor={service.id} className="flex flex-col md:flex-row md:items-center w-full justify-between">
-                        <span>{service.name}</span>
-                        <span className="font-bold text-brand-blue">{service.price}</span>
-                      </label>
+                    <div key={service.id} className="flex items-center justify-between p-3 border rounded-md">
+                      <div className="flex items-center">
+                        <Checkbox 
+                          id={service.id} 
+                          checked={selectedServices.includes(service.id)}
+                          onCheckedChange={() => handleServiceToggle(service.id)}
+                          className="mr-3 h-5 w-5" 
+                        />
+                        <label htmlFor={service.id}>{service.name}</label>
+                      </div>
+                      <span className="font-bold text-brand-blue">{service.price}</span>
                     </div>
                   ))}
                 </div>
+                {selectedServices.length > 0 && (
+                  <div className="bg-gray-50 mt-4 p-4 rounded-md flex justify-between items-center">
+                    <span className="font-medium">Total:</span>
+                    <span className="font-bold text-lg text-brand-blue">{formattedTotal()}</span>
+                  </div>
+                )}
+                {selectedServices.length === 0 && (
+                  <p className="text-amber-600 mt-2">Please select at least one service</p>
+                )}
               </div>
               
               {/* Location & Scheduling */}
@@ -259,7 +289,11 @@ const Booking = () => {
                   </label>
                 </div>
                 
-                <Button type="submit" className="btn-primary w-full py-3 text-lg">
+                <Button 
+                  type="submit" 
+                  className="btn-primary w-full py-3 text-lg"
+                  disabled={selectedServices.length === 0}
+                >
                   Book Now
                 </Button>
               </div>
