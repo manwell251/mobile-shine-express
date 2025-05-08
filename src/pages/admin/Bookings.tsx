@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -9,57 +9,56 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import BookingListView from '@/components/admin/bookings/BookingListView';
 import BookingCalendarView from '@/components/admin/bookings/BookingCalendarView';
 import BookingFilters from '@/components/admin/bookings/BookingFilters';
-import { Booking } from '@/types/booking';
+import { bookingsService, BookingWithDetails } from '@/services/bookings';
+import { useToast } from '@/hooks/use-toast';
 
 const Bookings = () => {
   const [showAddBooking, setShowAddBooking] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
 
-  // Mock data - would come from backend API
-  const bookings: Booking[] = [
-    {
-      id: 'BK001',
-      customerName: 'John Doe',
-      phone: '+256 700 123 456',
-      services: ['Basic Wash Package'],
-      date: '2025-05-05',
-      time: '10:00 AM',
-      status: 'Scheduled',
-      totalAmount: 'UGX 25,000'
-    },
-    {
-      id: 'BK002',
-      customerName: 'Jane Smith',
-      phone: '+256 780 567 890',
-      services: ['Premium Detail Package', 'Headlight Restoration'],
-      date: '2025-05-06',
-      time: '2:00 PM',
-      status: 'Draft',
-      totalAmount: 'UGX 70,000'
-    },
-    {
-      id: 'BK003',
-      customerName: 'Robert Johnson',
-      phone: '+256 712 345 678',
-      services: ['Full-Service Wash Package'],
-      date: '2025-05-04',
-      time: '11:30 AM',
-      status: 'Completed',
-      totalAmount: 'UGX 35,000'
-    },
-    {
-      id: 'BK004',
-      customerName: 'Emily Brown',
-      phone: '+256 756 789 012',
-      services: ['Complete Detailing Package'],
-      date: '2025-05-07',
-      time: '9:00 AM',
-      status: 'InProgress',
-      totalAmount: 'UGX 150,000'
+  useEffect(() => {
+    fetchBookings();
+  }, [statusFilter]);
+
+  // Handle search with debounce
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      fetchBookings();
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  const fetchBookings = async () => {
+    try {
+      setIsLoading(true);
+      let fetchedBookings;
+      
+      if (searchTerm) {
+        fetchedBookings = await bookingsService.search(searchTerm);
+      } else {
+        fetchedBookings = await bookingsService.getByStatus(statusFilter);
+      }
+      
+      setBookings(fetchedBookings);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load bookings data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const getStatusClass = (status: string) => {
     switch(status) {
@@ -71,13 +70,6 @@ const Bookings = () => {
       default: return 'bg-gray-100 text-gray-700';
     }
   };
-
-  // Filter bookings based on status and search term
-  const filteredBookings = bookings.filter(booking => {
-    return (statusFilter === 'all' || booking.status === statusFilter) &&
-      (booking.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       booking.id.toLowerCase().includes(searchTerm.toLowerCase()));
-  });
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -116,8 +108,9 @@ const Bookings = () => {
 
           {/* Bookings Table */}
           <BookingListView 
-            bookings={filteredBookings} 
-            getStatusClass={getStatusClass} 
+            bookings={bookings} 
+            getStatusClass={getStatusClass}
+            isLoading={isLoading}
           />
         </TabsContent>
         
