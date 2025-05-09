@@ -39,20 +39,13 @@ export const bookingsService = {
     // For each booking, fetch the associated services
     const bookingsWithServices = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: bookingServices, error: servicesError } = await supabase
+        const { data: serviceData } = await supabase
           .from('booking_services')
-          .select(`
-            service_id,
-            services (
-              name
-            )
-          `)
+          .select('*, services(name)')
           .eq('booking_id', booking.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
-
+        const services = serviceData?.map(item => item.services?.name || '') || [];
+        
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
           currency: 'UGX',
@@ -65,7 +58,7 @@ export const bookingsService = {
           booking_reference: booking.booking_reference,
           customerName: booking.customers?.name || 'Unknown',
           phone: booking.customers?.phone || 'No phone',
-          services: serviceNames,
+          services: services,
           date: format(new Date(booking.date), 'yyyy-MM-dd'),
           time: booking.time,
           status: booking.status,
@@ -103,20 +96,13 @@ export const bookingsService = {
     // For each booking, fetch the associated services
     const bookingsWithServices = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: bookingServices, error: servicesError } = await supabase
+        const { data: serviceData } = await supabase
           .from('booking_services')
-          .select(`
-            service_id,
-            services (
-              name
-            )
-          `)
+          .select('*, services(name)')
           .eq('booking_id', booking.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
-
+        const services = serviceData?.map(item => item.services?.name || '') || [];
+        
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
           currency: 'UGX',
@@ -129,7 +115,7 @@ export const bookingsService = {
           booking_reference: booking.booking_reference,
           customerName: booking.customers?.name || 'Unknown',
           phone: booking.customers?.phone || 'No phone',
-          services: serviceNames,
+          services: services,
           date: format(new Date(booking.date), 'yyyy-MM-dd'),
           time: booking.time,
           status: booking.status,
@@ -162,20 +148,13 @@ export const bookingsService = {
     // Process bookings the same way as in getAll
     const bookingsWithServices = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: bookingServices, error: servicesError } = await supabase
+        const { data: serviceData } = await supabase
           .from('booking_services')
-          .select(`
-            service_id,
-            services (
-              name
-            )
-          `)
+          .select('*, services(name)')
           .eq('booking_id', booking.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
-
+        const services = serviceData?.map(item => item.services?.name || '') || [];
+        
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
           currency: 'UGX',
@@ -188,7 +167,7 @@ export const bookingsService = {
           booking_reference: booking.booking_reference,
           customerName: booking.customers?.name || 'Unknown',
           phone: booking.customers?.phone || 'No phone',
-          services: serviceNames,
+          services: services,
           date: format(new Date(booking.date), 'yyyy-MM-dd'),
           time: booking.time,
           status: booking.status,
@@ -219,20 +198,13 @@ export const bookingsService = {
     if (error) throw error;
     if (!booking) return null;
 
-    const { data: bookingServices, error: servicesError } = await supabase
+    const { data: serviceData } = await supabase
       .from('booking_services')
-      .select(`
-        service_id,
-        services (
-          name
-        )
-      `)
+      .select('*, services(name)')
       .eq('booking_id', booking.id);
 
-    if (servicesError) throw servicesError;
-
-    const serviceNames = bookingServices.map(item => item.services?.name || '');
-
+    const services = serviceData?.map(item => item.services?.name || '') || [];
+    
     const formattedAmount = new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
@@ -245,7 +217,7 @@ export const bookingsService = {
       booking_reference: booking.booking_reference,
       customerName: booking.customers?.name || 'Unknown',
       phone: booking.customers?.phone || 'No phone',
-      services: serviceNames,
+      services: services,
       date: format(new Date(booking.date), 'yyyy-MM-dd'),
       time: booking.time,
       status: booking.status,
@@ -388,20 +360,13 @@ export const bookingsService = {
     // Process bookings the same way as in getAll
     const bookingsWithServices = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: bookingServices, error: servicesError } = await supabase
+        const { data: serviceData } = await supabase
           .from('booking_services')
-          .select(`
-            service_id,
-            services (
-              name
-            )
-          `)
+          .select('*, services(name)')
           .eq('booking_id', booking.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
-
+        const services = serviceData?.map(item => item.services?.name || '') || [];
+        
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
           currency: 'UGX',
@@ -414,7 +379,7 @@ export const bookingsService = {
           booking_reference: booking.booking_reference,
           customerName: booking.customers?.name || 'Unknown',
           phone: booking.customers?.phone || 'No phone',
-          services: serviceNames,
+          services: services,
           date: format(new Date(booking.date), 'yyyy-MM-dd'),
           time: booking.time,
           status: booking.status,
@@ -446,20 +411,13 @@ export const bookingsService = {
     // Process bookings the same way as in getAll
     const bookingsWithServices = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: bookingServices, error: servicesError } = await supabase
+        const { data: serviceData } = await supabase
           .from('booking_services')
-          .select(`
-            service_id,
-            services (
-              name
-            )
-          `)
+          .select('*, services(name)')
           .eq('booking_id', booking.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
-
+        const services = serviceData?.map(item => item.services?.name || '') || [];
+        
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
           currency: 'UGX',
@@ -472,7 +430,7 @@ export const bookingsService = {
           booking_reference: booking.booking_reference,
           customerName: booking.customers?.name || 'Unknown',
           phone: booking.customers?.phone || 'No phone',
-          services: serviceNames,
+          services: services,
           date: format(new Date(booking.date), 'yyyy-MM-dd'),
           time: booking.time,
           status: booking.status,

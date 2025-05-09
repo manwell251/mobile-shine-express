@@ -62,18 +62,12 @@ export const jobsService = {
           };
         }
 
-        const { data: bookingServices, error: servicesError } = await supabase
-          .from('booking_services')
-          .select(`
-            services (
-              name
-            )
-          `)
-          .eq('booking_id', job.booking_id);
+        const { data: serviceData } = await supabase
+          .from('job_services')
+          .select('*, services(name)')
+          .eq('job_id', job.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
+        const services = serviceData?.map(item => item.services?.name || '') || [];
 
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
@@ -87,7 +81,7 @@ export const jobsService = {
           job_reference: job.job_reference,
           bookingId: job.bookings?.booking_reference || 'No Booking',
           customerName: job.bookings?.customers?.name || 'Unknown',
-          services: serviceNames,
+          services: services,
           date: format(new Date(job.date), 'yyyy-MM-dd'),
           status: job.status as any,
           amount: formattedAmount,
@@ -148,18 +142,12 @@ export const jobsService = {
           };
         }
 
-        const { data: bookingServices, error: servicesError } = await supabase
-          .from('booking_services')
-          .select(`
-            services (
-              name
-            )
-          `)
-          .eq('booking_id', job.booking_id);
+        const { data: serviceData } = await supabase
+          .from('job_services')
+          .select('*, services(name)')
+          .eq('job_id', job.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
+        const services = serviceData?.map(item => item.services?.name || '') || [];
 
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
@@ -173,7 +161,7 @@ export const jobsService = {
           job_reference: job.job_reference,
           bookingId: job.bookings?.booking_reference || 'No Booking',
           customerName: job.bookings?.customers?.name || 'Unknown',
-          services: serviceNames,
+          services: services,
           date: format(new Date(job.date), 'yyyy-MM-dd'),
           status: job.status as any,
           amount: formattedAmount,
@@ -214,17 +202,14 @@ export const jobsService = {
     // Fetch services for this job's booking
     let serviceNames: string[] = [];
     if (job.booking_id) {
-      const { data: bookingServices, error: servicesError } = await supabase
-        .from('booking_services')
-        .select(`
-          services (
-            name
-          )
-        `)
-        .eq('booking_id', job.booking_id);
+      const { data: serviceData } = await supabase
+        .from('job_services')
+        .select('*, services(name)')
+        .eq('job_id', job.id);
 
-      if (servicesError) throw servicesError;
-      serviceNames = bookingServices.map(item => item.services?.name || '');
+      const services = serviceData?.map(item => item.services?.name || '') || [];
+
+      serviceNames = services;
     }
 
     const formattedAmount = new Intl.NumberFormat('en-UG', {
@@ -340,18 +325,12 @@ export const jobsService = {
           };
         }
 
-        const { data: bookingServices, error: servicesError } = await supabase
-          .from('booking_services')
-          .select(`
-            services (
-              name
-            )
-          `)
-          .eq('booking_id', job.booking_id);
+        const { data: serviceData } = await supabase
+          .from('job_services')
+          .select('*, services(name)')
+          .eq('job_id', job.id);
 
-        if (servicesError) throw servicesError;
-
-        const serviceNames = bookingServices.map(item => item.services?.name || '');
+        const services = serviceData?.map(item => item.services?.name || '') || [];
 
         const formattedAmount = new Intl.NumberFormat('en-UG', {
           style: 'currency',
@@ -365,7 +344,7 @@ export const jobsService = {
           job_reference: job.job_reference,
           bookingId: job.bookings?.booking_reference || 'No Booking',
           customerName: job.bookings?.customers?.name || 'Unknown',
-          services: serviceNames,
+          services: services,
           date: format(new Date(job.date), 'yyyy-MM-dd'),
           status: job.status as any,
           amount: formattedAmount,

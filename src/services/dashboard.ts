@@ -1,117 +1,156 @@
-
 import { supabase } from '@/lib/supabase';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { Database } from '@/types/database.types';
 
-export interface DashboardStats {
+export type DashboardStats = {
   bookingsToday: number;
   pendingJobs: number;
   revenueMonth: string;
   totalCustomers: number;
-}
+};
 
-export interface UpcomingBooking {
+export type UpcomingBooking = {
   id: string;
   customerName: string;
   service: string;
-  date: string;
   time: string;
   status: string;
+};
+
+async function mapBookingForDashboard(booking: any) {
+  try {
+    const { data: serviceData } = await supabase
+      .from('booking_services')
+      .select('*, services(name)')
+      .eq('booking_id', booking.id);
+    
+    const service = serviceData && serviceData.length > 0 ? 
+      serviceData[0].services?.name || '' : '';
+    
+    return {
+      id: booking.id,
+      customerName: booking.customer_name,
+      service: service,
+      time: booking.time,
+      status: booking.status,
+    };
+  } catch (error) {
+    console.error("Error mapping booking:", error);
+    return null;
+  }
 }
 
 export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const startOfCurrentMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-    const endOfCurrentMonth = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+    try {
+      // Fetch total bookings for today
+      const { count: bookingsToday, error: bookingsTodayError } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact' })
+        .eq('date', new Date().toISOString().slice(0, 10));
 
-    // Get bookings today
-    const { count: bookingsToday } = await supabase
-      .from('bookings')
-      .select('*', { count: 'exact', head: true })
-      .eq('date', today);
+      if (bookingsTodayError) {
+        console.error("Error fetching bookings for today:", bookingsTodayError);
+        throw bookingsTodayError;
+      }
 
-    // Get pending jobs
-    const { count: pendingJobs } = await supabase
-      .from('jobs')
-      .select('*', { count: 'exact', head: true })
-      .in('status', ['Scheduled', 'InProgress']);
+      // Fetch total pending jobs
+      const { count: pendingJobs, error: pendingJobsError } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact' })
+        .eq('status', 'Scheduled');
 
-    // Get monthly revenue
-    const { data: monthlyBookings } = await supabase
-      .from('bookings')
-      .select('total_amount')
-      .gte('date', startOfCurrentMonth)
-      .lte('date', endOfCurrentMonth);
+      if (pendingJobsError) {
+        console.error("Error fetching pending jobs:", pendingJobsError);
+        throw pendingJobsError;
+      }
 
-    const revenueMonth = monthlyBookings?.reduce((sum, booking) => sum + booking.total_amount, 0) || 0;
+      // Calculate total revenue for the current month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const startOfMonthISO = startOfMonth.toISOString();
 
-    // Get total customers
-    const { count: totalCustomers } = await supabase
-      .from('customers')
-      .select('*', { count: 'exact', head: true });
+      const endOfMonth = new Date();
+      endOfMonth.setMonth(endOfMonth.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+      const endOfMonthISO = endOfMonth.toISOString();
 
-    const formattedRevenue = new Intl.NumberFormat('en-UG', {
-      style: 'currency',
-      currency: 'UGX',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 1
-    }).format(revenueMonth / 1000000) + 'M';
+      const { data: monthlyRevenueData, error: monthlyRevenueError } = await supabase
+        .from('jobs')
+        .select('amount')
+        .gte('date', startOfMonthISO.slice(0, 10))
+        .lte('date', endOfMonthISO.slice(0, 10))
+      
+      if (monthlyRevenueError) {
+        console.error("Error fetching monthly revenue:", monthlyRevenueError);
+        throw monthlyRevenueError;
+      }
 
-    return {
-      bookingsToday: bookingsToday || 0,
-      pendingJobs: pendingJobs || 0,
-      revenueMonth: formattedRevenue,
-      totalCustomers: totalCustomers || 0
-    };
+      let totalRevenue = 0;
+      if (monthlyRevenueData && monthlyRevenueData.length > 0) {
+        totalRevenue = monthlyRevenueData.reduce((sum, job) => {
+          const amount = parseFloat(job.amount.replace(/[^0-9.]/g, '')) || 0;
+          return sum + amount;
+        }, 0);
+      }
+
+      const revenueMonth = new Intl.NumberFormat('en-UG', {
+        style: 'currency',
+        currency: 'UGX',
+      }).format(totalRevenue);
+
+      // Fetch total customers
+      const { count: totalCustomers, error: totalCustomersError } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact' });
+
+      if (totalCustomersError) {
+        console.error("Error fetching total customers:", totalCustomersError);
+        throw totalCustomersError;
+      }
+
+      return {
+        bookingsToday: bookingsToday || 0,
+        pendingJobs: pendingJobs || 0,
+        revenueMonth,
+        totalCustomers: totalCustomers || 0,
+      };
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      throw error;
+    }
   },
 
   async getUpcomingBookings(): Promise<UpcomingBooking[]> {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const tomorrow = format(new Date(new Date().setDate(new Date().getDate() + 1)), 'yyyy-MM-dd');
-    
-    const { data: bookings, error } = await supabase
-      .from('bookings')
-      .select(`
-        id,
-        booking_reference,
-        date,
-        time,
-        status,
-        customers (name)
-      `)
-      .in('date', [today, tomorrow])
-      .order('date')
-      .order('time');
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('date', today);
 
-    if (error) throw error;
+      if (error) {
+        console.error("Error fetching upcoming bookings:", error);
+        throw error;
+      }
 
-    const upcomingWithServices = await Promise.all(
-      bookings.map(async (booking) => {
-        const { data: bookingServices, error: servicesError } = await supabase
-          .from('booking_services')
-          .select(`
-            services (
-              name
-            )
-          `)
-          .eq('booking_id', booking.id)
-          .limit(1);
+      if (!bookings) {
+        return [];
+      }
 
-        if (servicesError) throw servicesError;
+      // Map bookings to the desired format
+      const upcomingBookings = [];
+      for (const booking of bookings) {
+        const mappedBooking = await mapBookingForDashboard(booking);
+        if (mappedBooking) {
+          upcomingBookings.push(mappedBooking);
+        }
+      }
 
-        const primaryService = bookingServices.length > 0 ? bookingServices[0].services?.name : 'No service';
-
-        return {
-          id: booking.booking_reference,
-          customerName: booking.customers?.name || 'Unknown',
-          service: primaryService || 'Unknown service',
-          date: format(parseISO(booking.date), 'yyyy-MM-dd'),
-          time: booking.time,
-          status: booking.status
-        };
-      })
-    );
-
-    return upcomingWithServices;
-  }
+      return upcomingBookings;
+    } catch (error) {
+      console.error("Error fetching upcoming bookings:", error);
+      return [];
+    }
+  },
 };
