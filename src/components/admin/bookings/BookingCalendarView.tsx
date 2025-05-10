@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { Booking } from '@/types/booking';
+import { BookingWithDetails } from '@/services/bookings';
 
 interface BookingCalendarViewProps {
-  bookings: Booking[];
+  bookings: BookingWithDetails[];
 }
 
 const BookingCalendarView: React.FC<BookingCalendarViewProps> = ({ bookings }) => {

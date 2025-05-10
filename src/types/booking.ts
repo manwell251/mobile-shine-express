@@ -11,3 +11,28 @@ export interface Booking {
   status: BookingStatus;
   totalAmount: string;
 }
+
+export interface BookingInsert {
+  booking_reference: string;
+  customer_id?: string | null;
+  date: string;
+  time: string;
+  location: string;
+  notes?: string | null;
+  status: BookingStatus;
+  total_amount: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BookingUpdate {
+  booking_reference?: string;
+  customer_id?: string | null;
+  date?: string;
+  time?: string;
+  location?: string;
+  notes?: string | null;
+  status?: BookingStatus;
+  total_amount?: number;
+  updated_at?: string;
+}
