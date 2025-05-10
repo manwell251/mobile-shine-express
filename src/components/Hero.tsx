@@ -8,10 +8,12 @@ const Hero = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   const backgroundImages = [
-    "https://images.unsplash.com/photo-1520340356584-0248e45c7c98?auto=format&fit=crop&q=80&w=2069",
-    "https://images.unsplash.com/photo-1605723517503-3cadb5818a0c?auto=format&fit=crop&q=80&w=2069",
-    "https://images.unsplash.com/photo-1600706002115-514a88aab33f?auto=format&fit=crop&q=80&w=2069",
-    "https://images.unsplash.com/photo-1607350412986-a40d93f2e448?auto=format&fit=crop&q=80&w=2069"
+    "car2.avif",
+    "car1.avif",
+    "img1.png",
+    "home.png",
+    "car-seat-upholstery-cleaning-washing-d.webp",
+    "carafter1.png"
   ];
 
   useEffect(() => {

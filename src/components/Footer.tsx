@@ -9,7 +9,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-xl font-bold mb-4">KLIN<span className="text-brand-green">RIDE</span></h3>
+            <h3 className="text-xl font-bold mb-4  text-white">KLIN<span className="text-brand-green">RIDE</span></h3>
             <p className="mb-4 text-gray-300">A sparkling Ride Wherever You Are!</p>
             <div className="flex space-x-4">
               <a href="#" className="text-white hover:text-brand-blue">
@@ -33,7 +33,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="text-xl font-bold mb-4">Quick Links</h3>
+            <h3 className="text-xl font-bold mb-4 text-white">Quick Links</h3>
             <ul className="space-y-2">
               <li><Link to="/" className="text-gray-300 hover:text-white">Home</Link></li>
               <li><Link to="/services" className="text-gray-300 hover:text-white">Services</Link></li>
@@ -45,7 +45,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="text-xl font-bold mb-4">Our Services</h3>
+            <h3 className="text-xl font-bold mb-4 text-white">Our Services</h3>
             <ul className="space-y-2">
               <li><Link to="/services" className="text-gray-300 hover:text-white">Basic Wash</Link></li>
               <li><Link to="/services" className="text-gray-300 hover:text-white">Full-Service Wash</Link></li>
@@ -56,18 +56,19 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="text-xl font-bold mb-4">Contact Us</h3>
+            <h3 className="text-xl font-bold mb-4 text-white">Contact Us</h3>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Phone size={18} className="mr-2 mt-1 text-brand-blue" />
                 <div>
                   <p className="text-gray-300">+256 776 041 056</p>
                   <p className="text-gray-300">+256 704 818 826</p>
+                  <p className="text-gray-300">+256 752 415 762</p>
                 </div>
               </li>
               <li className="flex items-start">
                 <Mail size={18} className="mr-2 mt-1 text-brand-blue" />
-                <p className="text-gray-300">klinride25@gmail.com</p>
+                <p className="text-gray-300">klinrideug@gmail.com</p>
               </li>
               <li className="flex items-start">
                 <MapPin size={18} className="mr-2 mt-1 text-brand-blue" />

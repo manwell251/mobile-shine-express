@@ -39,7 +39,7 @@ const AboutPreview = () => {
           <div className="order-1 lg:order-2 relative">
             <div className="rounded-xl overflow-hidden shadow-xl">
               <img 
-                src="https://images.unsplash.com/photo-1604705527717-8a292b96b3c9?auto=format&fit=crop&q=80&w=1000" 
+                src="home.png" 
                 alt="Car detailing professional" 
                 className="w-full h-auto"
               />

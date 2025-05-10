@@ -2,6 +2,7 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PageHeroCarousel from '@/components/PageHeroCarousel';
 import CallToAction from '@/components/CallToAction';
 import { Car, Droplets, SprayCan, Zap, Settings, Users, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -13,14 +14,16 @@ const Services = () => {
       <Navbar />
       
       {/* Hero Section */}
-      <div className="relative py-20 md:py-32 bg-brand-darkBlue text-white text-center">
+      {/* <div className="relative py-20 md:py-32 bg-brand-darkBlue text-white text-center">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Services</h1>
           <p className="text-lg md:text-xl max-w-3xl mx-auto">
             Professional mobile car wash services designed to keep your vehicle looking pristine — wherever you are.
           </p>
         </div>
-      </div>
+      </div> */}
+
+      <PageHeroCarousel pageType='services'/>
 
       {/* Basic Wash Package */}
       <section id="basic" className="section-padding bg-white">
@@ -63,7 +66,7 @@ const Services = () => {
             </div>
             <div className="rounded-xl overflow-hidden shadow-xl">
               <img 
-                src="https://images.unsplash.com/photo-1605515298946-d062f2e9da53?auto=format&fit=crop&q=80&w=1000" 
+                src="foamedup.webp" 
                 alt="Basic car wash" 
                 className="w-full h-auto"
               />
@@ -78,7 +81,7 @@ const Services = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-xl overflow-hidden shadow-xl">
               <img 
-                src="https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&q=80&w=1000" 
+                src="car-seat-upholstery-cleaning-washing-d.webp" 
                 alt="Full service car wash" 
                 className="w-full h-auto"
               />
@@ -171,7 +174,7 @@ const Services = () => {
             </div>
             <div className="rounded-xl overflow-hidden shadow-xl">
               <img 
-                src="https://images.unsplash.com/photo-1655634535290-6bab0013accc?auto=format&fit=crop&q=80&w=1000" 
+                src="waxing.avif" 
                 alt="Premium car detailing" 
                 className="w-full h-auto"
               />
@@ -186,7 +189,7 @@ const Services = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-xl overflow-hidden shadow-xl">
               <img 
-                src="https://images.unsplash.com/photo-1643730947003-2191ad478de1?auto=format&fit=crop&q=80&w=1000" 
+                src="Headlight-Restoration-Chesterfield-VA.png"
                 alt="Headlight restoration" 
                 className="w-full h-auto"
               />

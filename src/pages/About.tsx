@@ -2,6 +2,7 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PageHeroCarousel from '@/components/PageHeroCarousel';
 import CallToAction from '@/components/CallToAction';
 import { Shield, Clock, Users, Heart } from 'lucide-react';
 
@@ -34,14 +35,16 @@ const About = () => {
       <Navbar />
       
       {/* Hero Section */}
-      <div className="relative py-20 md:py-32 bg-brand-darkBlue text-white text-center">
+      {/* <div className="relative py-20 md:py-32 bg-brand-darkBlue text-white text-center">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">About Us</h1>
           <p className="text-lg md:text-xl max-w-3xl mx-auto">
             Learn about our journey to becoming the premier mobile car detailing service.
           </p>
         </div>
-      </div>
+      </div> */}
+
+      <PageHeroCarousel pageType='services'/>
 
       {/* Who We Are Section */}
       <section className="section-padding bg-white">

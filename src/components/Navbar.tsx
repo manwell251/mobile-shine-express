@@ -15,7 +15,8 @@ const Navbar = () => {
     <nav className="bg-white shadow-md py-4 sticky top-0 z-50">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link to="/" className="flex items-center">
-          <span className="font-bold text-2xl text-brand-blue">KLIN<span className="text-brand-green">RIDE</span></span>
+          <img src="klinridelogo.png" alt="KlinRide Logo" style={{width: '120px', height: '120px'}}/>
+          {/* <span className="font-bold text-2xl text-brand-blue">KLIN<span className="text-brand-green">RIDE</span></span> */}
         </Link>
 
         {/* Desktop Menu */}
