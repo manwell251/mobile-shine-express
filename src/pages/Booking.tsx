@@ -1,25 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { CalendarIcon, Clock, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
-type ServiceOption = {
+interface ServiceOption {
   id: string;
   name: string;
-  price: string;
-};
-
-const services: ServiceOption[] = [
-  { id: "basic", name: "Basic Wash Package", price: "UGX 25,000" },
-  { id: "full", name: "Full-Service Wash Package", price: "UGX 35,000" },
-  { id: "premium", name: "Premium Detail Package", price: "UGX 50,000" },
-  { id: "headlight", name: "Headlight Restoration", price: "UGX 20,000" },
-  { id: "complete", name: "Complete Detailing Package", price: "UGX 150,000" }
-];
+  price: number;
+}
 
 const vehicleTypes = [
   "Sedan", "SUV", "Truck", "Van", "Motorcycle", "Other"
@@ -33,7 +27,57 @@ const timeSlots = [
 const Booking = () => {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [services, setServices] = useState<ServiceOption[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    make: '',
+    model: '',
+    year: '',
+    address: '',
+    notes: '',
+    agreeToTerms: false
+  });
+
+  // Fetch services from the database
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('services')
+          .select('id, name, price')
+          .eq('active', true);
+          
+        if (error) {
+          console.error("Error fetching services:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load services. Please try again.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        if (data) {
+          setServices(data);
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    fetchServices();
+  }, [toast]);
   
   const handleServiceToggle = (serviceId: string) => {
     setSelectedServices(prev => 
@@ -47,29 +91,156 @@ const Booking = () => {
   const calculateTotal = () => {
     return services
       .filter(service => selectedServices.includes(service.id))
-      .reduce((total, service) => {
-        const price = parseInt(service.price.replace(/\D/g, ''));
-        return total + price;
-      }, 0);
+      .reduce((total, service) => total + service.price, 0);
   };
 
   const formattedTotal = () => {
     const total = calculateTotal();
-    return `UGX ${total.toLocaleString()}`;
+    return new Intl.NumberFormat('en-UG', {
+      style: 'currency',
+      currency: 'UGX',
+      minimumFractionDigits: 0
+    }).format(total);
+  };
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target as HTMLInputElement;
+    
+    if (type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    toast({
-      title: "Booking Submitted",
-      description: "Your car wash has been booked! We'll confirm your appointment soon.",
-    });
+    if (selectedServices.length === 0) {
+      toast({
+        title: "Please select services",
+        description: "You must select at least one service to proceed.",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    // Reset form
-    e.currentTarget.reset();
-    setSelectedDate("");
-    setSelectedServices([]);
+    if (!formData.agreeToTerms) {
+      toast({
+        title: "Terms agreement",
+        description: "You must agree to the terms and conditions.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!selectedDate || !selectedTime) {
+      toast({
+        title: "Incomplete booking",
+        description: "Please select a date and time for your appointment.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Create the customer first
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .insert({
+          name: formData.name,
+          email: formData.email || null,
+          phone: formData.phone,
+          location: formData.address || null
+        })
+        .select()
+        .single();
+      
+      if (customerError) throw customerError;
+      if (!customer) throw new Error("Failed to create customer record");
+      
+      // Create the booking
+      const bookingReference = `BK${format(new Date(), 'yyMMdd')}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+      const totalAmount = calculateTotal();
+      
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          booking_reference: bookingReference,
+          customer_id: customer.id,
+          date: selectedDate,
+          time: selectedTime,
+          location: formData.address,
+          notes: `Vehicle: ${formData.make} ${formData.model} ${formData.year} (${selectedVehicleType}). ${formData.notes}`,
+          status: 'Scheduled',
+          total_amount: totalAmount
+        })
+        .select()
+        .single();
+      
+      if (bookingError) throw bookingError;
+      if (!booking) throw new Error("Failed to create booking record");
+      
+      // Add booking services
+      for (const serviceId of selectedServices) {
+        const service = services.find(s => s.id === serviceId);
+        if (!service) continue;
+        
+        const { error: serviceError } = await supabase
+          .from('booking_services')
+          .insert({
+            booking_id: booking.id,
+            service_id: serviceId,
+            quantity: 1,
+            price_at_booking: service.price
+          });
+          
+        if (serviceError) {
+          console.error("Error adding service to booking:", serviceError);
+          // Continue with other services even if one fails
+        }
+      }
+      
+      // Success!
+      toast({
+        title: "Booking Submitted",
+        description: `Your car wash has been booked! Reference: ${bookingReference}. We'll confirm your appointment soon.`,
+      });
+      
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        make: '',
+        model: '',
+        year: '',
+        address: '',
+        notes: '',
+        agreeToTerms: false
+      });
+      setSelectedDate("");
+      setSelectedTime("");
+      setSelectedVehicleType("");
+      setSelectedServices([]);
+    } catch (error) {
+      console.error("Booking error:", error);
+      toast({
+        title: "Booking Failed",
+        description: "There was a problem submitting your booking. Please try again or contact us directly.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -102,6 +273,9 @@ const Booking = () => {
                     <input 
                       type="text" 
                       id="name" 
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
                       required 
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                       placeholder="Your Name"
@@ -112,7 +286,9 @@ const Booking = () => {
                     <input 
                       type="email" 
                       id="email" 
-                      required 
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                       placeholder="Your Email"
                     />
@@ -122,6 +298,9 @@ const Booking = () => {
                     <input 
                       type="tel" 
                       id="phone" 
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
                       required 
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                       placeholder="Your Phone Number"
@@ -135,30 +314,39 @@ const Booking = () => {
                 <h3 className="text-xl font-bold mb-4">Vehicle Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="vehicle-make" className="block text-gray-700 mb-2">Vehicle Make</label>
+                    <label htmlFor="make" className="block text-gray-700 mb-2">Vehicle Make</label>
                     <input 
                       type="text" 
-                      id="vehicle-make" 
+                      id="make" 
+                      name="make"
+                      value={formData.make}
+                      onChange={handleChange}
                       required 
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                       placeholder="e.g. Toyota"
                     />
                   </div>
                   <div>
-                    <label htmlFor="vehicle-model" className="block text-gray-700 mb-2">Vehicle Model</label>
+                    <label htmlFor="model" className="block text-gray-700 mb-2">Vehicle Model</label>
                     <input 
                       type="text" 
-                      id="vehicle-model" 
+                      id="model" 
+                      name="model"
+                      value={formData.model}
+                      onChange={handleChange}
                       required 
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                       placeholder="e.g. Corolla"
                     />
                   </div>
                   <div>
-                    <label htmlFor="vehicle-year" className="block text-gray-700 mb-2">Vehicle Year</label>
+                    <label htmlFor="year" className="block text-gray-700 mb-2">Vehicle Year</label>
                     <input 
                       type="number" 
-                      id="vehicle-year" 
+                      id="year" 
+                      name="year"
+                      value={formData.year}
+                      onChange={handleChange}
                       required 
                       min="1900" 
                       max={new Date().getFullYear()} 
@@ -169,7 +357,9 @@ const Booking = () => {
                   <div>
                     <label htmlFor="vehicle-type" className="block text-gray-700 mb-2">Vehicle Type</label>
                     <select 
-                      id="vehicle-type" 
+                      id="vehicle-type"
+                      value={selectedVehicleType}
+                      onChange={(e) => setSelectedVehicleType(e.target.value)}
                       required
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
                     >
@@ -187,20 +377,30 @@ const Booking = () => {
                 <h3 className="text-xl font-bold mb-4">Select Services</h3>
                 <p className="text-gray-600 mb-4">Choose one or more services for your vehicle:</p>
                 <div className="grid grid-cols-1 gap-4">
-                  {services.map((service) => (
-                    <div key={service.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div className="flex items-center">
-                        <Checkbox 
-                          id={service.id} 
-                          checked={selectedServices.includes(service.id)}
-                          onCheckedChange={() => handleServiceToggle(service.id)}
-                          className="mr-3 h-5 w-5" 
-                        />
-                        <label htmlFor={service.id}>{service.name}</label>
+                  {services.length === 0 ? (
+                    <div className="text-center p-4">Loading services...</div>
+                  ) : (
+                    services.map((service) => (
+                      <div key={service.id} className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="flex items-center">
+                          <Checkbox 
+                            id={service.id} 
+                            checked={selectedServices.includes(service.id)}
+                            onCheckedChange={() => handleServiceToggle(service.id)}
+                            className="mr-3 h-5 w-5" 
+                          />
+                          <label htmlFor={service.id}>{service.name}</label>
+                        </div>
+                        <span className="font-bold text-brand-blue">
+                          {new Intl.NumberFormat('en-UG', {
+                            style: 'currency',
+                            currency: 'UGX',
+                            minimumFractionDigits: 0
+                          }).format(service.price)}
+                        </span>
                       </div>
-                      <span className="font-bold text-brand-blue">{service.price}</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
                 {selectedServices.length > 0 && (
                   <div className="bg-gray-50 mt-4 p-4 rounded-md flex justify-between items-center">
@@ -225,6 +425,9 @@ const Booking = () => {
                     <input 
                       type="text" 
                       id="address" 
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
                       required 
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                       placeholder="Enter your full address"
@@ -253,6 +456,8 @@ const Booking = () => {
                     <select 
                       id="time" 
                       required
+                      value={selectedTime}
+                      onChange={(e) => setSelectedTime(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
                     >
                       <option value="">Select Time Slot</option>
@@ -269,6 +474,9 @@ const Booking = () => {
                 <label htmlFor="notes" className="block text-gray-700 mb-2">Special Requests or Notes</label>
                 <textarea 
                   id="notes" 
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
                   rows={4} 
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" 
                   placeholder="Any additional information or requests you'd like us to know"
@@ -280,11 +488,14 @@ const Booking = () => {
                 <div className="flex items-start">
                   <input 
                     type="checkbox" 
-                    id="terms" 
+                    id="agreeToTerms" 
+                    name="agreeToTerms"
+                    checked={formData.agreeToTerms}
+                    onChange={handleChange}
                     required
                     className="mr-3 mt-1 h-4 w-4 text-brand-blue focus:ring-brand-blue" 
                   />
-                  <label htmlFor="terms" className="text-gray-700">
+                  <label htmlFor="agreeToTerms" className="text-gray-700">
                     I agree to the <a href="#" className="text-brand-blue underline">Terms and Conditions</a> and understand that my personal information will be processed in accordance with the <a href="#" className="text-brand-blue underline">Privacy Policy</a>.
                   </label>
                 </div>
@@ -292,9 +503,9 @@ const Booking = () => {
                 <Button 
                   type="submit" 
                   className="btn-primary w-full py-3 text-lg"
-                  disabled={selectedServices.length === 0}
+                  disabled={selectedServices.length === 0 || isLoading}
                 >
-                  Book Now
+                  {isLoading ? 'Processing...' : 'Book Now'}
                 </Button>
               </div>
             </form>

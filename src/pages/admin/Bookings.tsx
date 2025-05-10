@@ -71,6 +71,29 @@ const Bookings = () => {
     }
   };
 
+  const handleBookingSuccess = () => {
+    setShowAddBooking(false);
+    fetchBookings();
+  };
+
+  const handleDeleteBooking = async (id: string) => {
+    try {
+      await bookingsService.delete(id);
+      toast({
+        title: "Success",
+        description: "Booking deleted successfully"
+      });
+      fetchBookings();
+    } catch (error) {
+      console.error('Error deleting booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete booking. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
@@ -86,7 +109,10 @@ const Bookings = () => {
       {showAddBooking && (
         <Card className="p-4 mb-6">
           <h2 className="text-xl font-bold mb-4">New Booking</h2>
-          <BookingForm onCancel={() => setShowAddBooking(false)} />
+          <BookingForm 
+            onCancel={() => setShowAddBooking(false)} 
+            onSuccess={handleBookingSuccess}
+          />
         </Card>
       )}
 
@@ -111,6 +137,24 @@ const Bookings = () => {
             bookings={bookings} 
             getStatusClass={getStatusClass}
             isLoading={isLoading}
+            onDelete={handleDeleteBooking}
+            onStatusChange={async (id: string, status: string) => {
+              try {
+                await bookingsService.updateStatus(id, status as any);
+                toast({
+                  title: "Status Updated",
+                  description: `Booking status changed to ${status}`
+                });
+                fetchBookings();
+              } catch (error) {
+                console.error('Error updating status:', error);
+                toast({
+                  title: "Error",
+                  description: "Failed to update booking status",
+                  variant: "destructive"
+                });
+              }
+            }}
           />
         </TabsContent>
         
