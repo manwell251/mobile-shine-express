@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/types/database.types';
 import { format } from 'date-fns';
@@ -44,15 +45,34 @@ function formatBookingData(booking: any, services: string[]): BookingWithDetails
 }
 
 async function fetchBookingServices(bookingId: string): Promise<string[]> {
-  const { data: serviceData } = await supabase
+  const { data: serviceData, error } = await supabase
     .from('booking_services')
     .select('*, services(name)')
     .eq('booking_id', bookingId);
+
+  if (error) {
+    console.error('Error fetching booking services:', error);
+    return [];
+  }
 
   return serviceData?.map(item => item.services?.name || '') || [];
 }
 
 export const bookingsService = {
+  async getAvailableServices() {
+    const { data, error } = await supabase
+      .from('services')
+      .select('id, name, price, description')
+      .eq('active', true);
+      
+    if (error) {
+      console.error('Error fetching services:', error);
+      throw error;
+    }
+    
+    return { data };
+  },
+  
   async getAll(): Promise<BookingWithDetails[]> {
     try {
       // Fetch bookings with customer details
@@ -185,13 +205,13 @@ export const bookingsService = {
 
   async create(booking: BookingInsert, selectedServices: string[]): Promise<BookingRow> {
     try {
-      // Ensure booking reference is set (required by the database schema)
+      // Ensure booking reference is set
       if (!booking.booking_reference) {
         const timestamp = new Date().getTime().toString().slice(-6);
         booking.booking_reference = `BK${timestamp}`;
       }
 
-      // Start a transaction
+      // Insert the booking
       const { data, error } = await supabase
         .from('bookings')
         .insert(booking)
@@ -199,6 +219,7 @@ export const bookingsService = {
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error("Failed to create booking");
 
       // For each selected service, create a booking_services entry
       for (const serviceId of selectedServices) {
@@ -210,6 +231,7 @@ export const bookingsService = {
           .single();
 
         if (serviceError) throw serviceError;
+        if (!service) throw new Error(`Service with id ${serviceId} not found`);
 
         // Create booking_service entry
         const { error: bookingServiceError } = await supabase
@@ -242,14 +264,17 @@ export const bookingsService = {
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error("Failed to update booking");
 
       // If services were provided, update the booking_services
       if (selectedServices) {
         // First delete all existing booking_services
-        await supabase
+        const { error: deleteError } = await supabase
           .from('booking_services')
           .delete()
           .eq('booking_id', id);
+
+        if (deleteError) throw deleteError;
 
         // Then insert new ones
         for (const serviceId of selectedServices) {
@@ -261,6 +286,7 @@ export const bookingsService = {
             .single();
 
           if (serviceError) throw serviceError;
+          if (!service) throw new Error(`Service with id ${serviceId} not found`);
 
           // Create booking_service entry
           const { error: bookingServiceError } = await supabase
@@ -293,6 +319,8 @@ export const bookingsService = {
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error("Failed to update booking status");
+      
       return data;
     } catch (error) {
       console.error('Error in bookingsService.updateStatus:', error);

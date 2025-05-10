@@ -13,12 +13,16 @@ interface BookingListViewProps {
   bookings: BookingWithDetails[];
   getStatusClass: (status: string) => string;
   isLoading?: boolean;
+  onDelete?: (id: string) => Promise<void>;
+  onStatusChange?: (id: string, status: string) => Promise<void>;
 }
 
 const BookingListView: React.FC<BookingListViewProps> = ({ 
   bookings,
   getStatusClass,
-  isLoading = false
+  isLoading = false,
+  onDelete,
+  onStatusChange
 }) => {
   return (
     <Card>
@@ -106,9 +110,15 @@ const BookingListView: React.FC<BookingListViewProps> = ({
                       <Button variant="ghost" size="sm">
                         Edit
                       </Button>
-                      <Button variant="outline" size="sm">
-                        View
-                      </Button>
+                      {onDelete && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => onDelete(booking.id)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -131,6 +131,7 @@ const CustomerForm: React.FC<CustomerFormProps> = ({
             type="button" 
             variant="outline" 
             onClick={onCancel}
+            disabled={isSubmitting}
           >
             Cancel
           </Button>

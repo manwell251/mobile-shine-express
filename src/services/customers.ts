@@ -30,17 +30,21 @@ export const customerService = {
         customers.map(async (customer) => {
           try {
             // Get count of bookings
-            const { count: bookingsCount } = await supabase
+            const { count: bookingsCount, error: countError } = await supabase
               .from('bookings')
               .select('*', { count: 'exact', head: true })
               .eq('customer_id', customer.id);
 
+            if (countError) throw countError;
+
             // Get sum of booking amounts
-            const { data: bookings } = await supabase
+            const { data: bookings, error: bookingsError } = await supabase
               .from('bookings')
               .select('total_amount, date')
               .eq('customer_id', customer.id)
               .order('date', { ascending: false });
+
+            if (bookingsError) throw bookingsError;
 
             const totalSpent = bookings?.reduce((sum, booking) => sum + booking.total_amount, 0) || 0;
             const lastBooking = bookings && bookings.length > 0 ? bookings[0].date : null;
@@ -93,37 +97,72 @@ export const customerService = {
       return null;
     }
   },
+  
+  async findByPhone(phone: string): Promise<Customer | null> {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('phone', phone)
+        .maybeSingle();
+        
+      if (error) throw error;
+      return data || null;
+    } catch (error) {
+      console.error(`Error in customerService.findByPhone(${phone}):`, error);
+      return null; 
+    }
+  },
 
   async create(customer: CustomerInsert): Promise<Customer> {
-    const { data, error } = await supabase
-      .from('customers')
-      .insert(customer)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert(customer)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      if (!data) throw new Error("Failed to create customer");
+      
+      return data;
+    } catch (error) {
+      console.error('Error in customerService.create:', error);
+      throw error;
+    }
   },
 
   async update(id: string, customer: CustomerUpdate): Promise<Customer> {
-    const { data, error } = await supabase
-      .from('customers')
-      .update(customer)
-      .eq('id', id)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .update(customer)
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      if (!data) throw new Error("Failed to update customer");
+      
+      return data;
+    } catch (error) {
+      console.error('Error in customerService.update:', error);
+      throw error;
+    }
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('customers')
-      .delete()
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
 
-    if (error) throw error;
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error in customerService.delete:', error);
+      throw error;
+    }
   },
 
   async search(searchTerm: string): Promise<CustomerWithStats[]> {
