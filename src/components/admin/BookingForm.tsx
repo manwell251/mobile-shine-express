@@ -10,9 +10,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 interface BookingFormProps {
   onCancel: () => void;
   existingBooking?: any; // Type this properly in a real application
+  onSuccess?: () => void; // Added this property to fix the TypeScript error
 }
 
-const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking }) => {
+const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, onSuccess }) => {
   const [selectedServices, setSelectedServices] = useState<string[]>(existingBooking?.services || []);
   
   // Mock data - would be fetched from settings in a real app
@@ -46,6 +47,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking }) 
     e.preventDefault();
     // In a real app, you would send this data to your backend
     console.log("Form submitted with selected services:", selectedServices);
+    
+    // Call onSuccess if it's provided
+    if (onSuccess) {
+      onSuccess();
+    }
+    
     onCancel(); // Close form after submission
   };
 
