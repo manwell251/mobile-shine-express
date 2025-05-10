@@ -1,4 +1,6 @@
 
+export type BookingStatus = 'Draft' | 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled';
+
 export interface Booking {
   id: string;
   customerName: string;
@@ -6,6 +8,6 @@ export interface Booking {
   services: string[];
   date: string;
   time: string;
-  status: 'Draft' | 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled';
+  status: BookingStatus;
   totalAmount: string;
 }

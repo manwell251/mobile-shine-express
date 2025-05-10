@@ -1,6 +1,7 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/types/database.types';
 import { format } from 'date-fns';
+import { BookingStatus } from '@/types/booking';
 
 export type BookingRow = Database['public']['Tables']['bookings']['Row'];
 export type BookingInsert = Database['public']['Tables']['bookings']['Insert'];
@@ -14,7 +15,7 @@ export interface BookingWithDetails {
   services: string[];
   date: string;
   time: string;
-  status: string;
+  status: BookingStatus;
   totalAmount: string;
   location: string;
   notes?: string;
@@ -23,111 +24,129 @@ export interface BookingWithDetails {
 
 export const bookingsService = {
   async getAll(): Promise<BookingWithDetails[]> {
-    // Fetch bookings with customer details
-    const { data: bookings, error } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        customers (
-          name,
-          phone
-        )
-      `);
+    try {
+      // Fetch bookings with customer details
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          customers (
+            name,
+            phone
+          )
+        `);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // For each booking, fetch the associated services
-    const bookingsWithServices = await Promise.all(
-      bookings.map(async (booking) => {
-        const { data: serviceData } = await supabase
-          .from('booking_services')
-          .select('*, services(name)')
-          .eq('booking_id', booking.id);
+      if (!bookings || bookings.length === 0) {
+        return [];
+      }
 
-        const services = serviceData?.map(item => item.services?.name || '') || [];
-        
-        const formattedAmount = new Intl.NumberFormat('en-UG', {
-          style: 'currency',
-          currency: 'UGX',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        }).format(booking.total_amount);
+      // For each booking, fetch the associated services
+      const bookingsWithServices = await Promise.all(
+        bookings.map(async (booking) => {
+          const { data: serviceData } = await supabase
+            .from('booking_services')
+            .select('*, services(name)')
+            .eq('booking_id', booking.id);
 
-        return {
-          id: booking.id,
-          booking_reference: booking.booking_reference,
-          customerName: booking.customers?.name || 'Unknown',
-          phone: booking.customers?.phone || 'No phone',
-          services: services,
-          date: format(new Date(booking.date), 'yyyy-MM-dd'),
-          time: booking.time,
-          status: booking.status,
-          totalAmount: formattedAmount,
-          location: booking.location,
-          notes: booking.notes || undefined,
-          customer_id: booking.customer_id || undefined
-        };
-      })
-    );
+          const services = serviceData?.map(item => item.services?.name || '') || [];
+          
+          const formattedAmount = new Intl.NumberFormat('en-UG', {
+            style: 'currency',
+            currency: 'UGX',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(booking.total_amount);
 
-    return bookingsWithServices;
+          return {
+            id: booking.id,
+            booking_reference: booking.booking_reference,
+            customerName: booking.customers?.name || 'Unknown',
+            phone: booking.customers?.phone || 'No phone',
+            services: services,
+            date: format(new Date(booking.date), 'yyyy-MM-dd'),
+            time: booking.time,
+            status: booking.status as BookingStatus,
+            totalAmount: formattedAmount,
+            location: booking.location,
+            notes: booking.notes || undefined,
+            customer_id: booking.customer_id || undefined
+          };
+        })
+      );
+
+      return bookingsWithServices;
+    } catch (error) {
+      console.error('Error in bookingsService.getAll:', error);
+      return [];
+    }
   },
 
   async getByStatus(status: string): Promise<BookingWithDetails[]> {
-    // If status is 'all', fetch all bookings
-    if (status === 'all') {
-      return this.getAll();
+    try {
+      // If status is 'all', fetch all bookings
+      if (status === 'all') {
+        return this.getAll();
+      }
+
+      // Otherwise, filter by status
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          customers (
+            name,
+            phone
+          )
+        `)
+        .eq('status', status);
+
+      if (error) throw error;
+
+      if (!bookings || bookings.length === 0) {
+        return [];
+      }
+
+      // For each booking, fetch the associated services
+      const bookingsWithServices = await Promise.all(
+        bookings.map(async (booking) => {
+          const { data: serviceData } = await supabase
+            .from('booking_services')
+            .select('*, services(name)')
+            .eq('booking_id', booking.id);
+
+          const services = serviceData?.map(item => item.services?.name || '') || [];
+          
+          const formattedAmount = new Intl.NumberFormat('en-UG', {
+            style: 'currency',
+            currency: 'UGX',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(booking.total_amount);
+
+          return {
+            id: booking.id,
+            booking_reference: booking.booking_reference,
+            customerName: booking.customers?.name || 'Unknown',
+            phone: booking.customers?.phone || 'No phone',
+            services: services,
+            date: format(new Date(booking.date), 'yyyy-MM-dd'),
+            time: booking.time,
+            status: booking.status as BookingStatus,
+            totalAmount: formattedAmount,
+            location: booking.location,
+            notes: booking.notes || undefined,
+            customer_id: booking.customer_id || undefined
+          };
+        })
+      );
+
+      return bookingsWithServices;
+    } catch (error) {
+      console.error('Error in bookingsService.getByStatus:', error);
+      return [];
     }
-
-    // Otherwise, filter by status
-    const { data: bookings, error } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        customers (
-          name,
-          phone
-        )
-      `)
-      .eq('status', status);
-
-    if (error) throw error;
-
-    // For each booking, fetch the associated services
-    const bookingsWithServices = await Promise.all(
-      bookings.map(async (booking) => {
-        const { data: serviceData } = await supabase
-          .from('booking_services')
-          .select('*, services(name)')
-          .eq('booking_id', booking.id);
-
-        const services = serviceData?.map(item => item.services?.name || '') || [];
-        
-        const formattedAmount = new Intl.NumberFormat('en-UG', {
-          style: 'currency',
-          currency: 'UGX',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        }).format(booking.total_amount);
-
-        return {
-          id: booking.id,
-          booking_reference: booking.booking_reference,
-          customerName: booking.customers?.name || 'Unknown',
-          phone: booking.customers?.phone || 'No phone',
-          services: services,
-          date: format(new Date(booking.date), 'yyyy-MM-dd'),
-          time: booking.time,
-          status: booking.status,
-          totalAmount: formattedAmount,
-          location: booking.location,
-          notes: booking.notes || undefined,
-          customer_id: booking.customer_id || undefined
-        };
-      })
-    );
-
-    return bookingsWithServices;
   },
 
   async getByDateRange(startDate: string, endDate: string): Promise<BookingWithDetails[]> {
@@ -343,55 +362,64 @@ export const bookingsService = {
   },
 
   async search(searchTerm: string): Promise<BookingWithDetails[]> {
-    // Search in bookings and related customer data
-    const { data: bookings, error } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        customers (
-          name,
-          phone
-        )
-      `)
-      .or(`booking_reference.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
+    try {
+      // Search in bookings and related customer data
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          customers (
+            name,
+            phone
+          )
+        `)
+        .or(`booking_reference.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Process bookings the same way as in getAll
-    const bookingsWithServices = await Promise.all(
-      bookings.map(async (booking) => {
-        const { data: serviceData } = await supabase
-          .from('booking_services')
-          .select('*, services(name)')
-          .eq('booking_id', booking.id);
+      if (!bookings || bookings.length === 0) {
+        return [];
+      }
 
-        const services = serviceData?.map(item => item.services?.name || '') || [];
-        
-        const formattedAmount = new Intl.NumberFormat('en-UG', {
-          style: 'currency',
-          currency: 'UGX',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        }).format(booking.total_amount);
+      // Process bookings the same way as in getAll
+      const bookingsWithServices = await Promise.all(
+        bookings.map(async (booking) => {
+          const { data: serviceData } = await supabase
+            .from('booking_services')
+            .select('*, services(name)')
+            .eq('booking_id', booking.id);
 
-        return {
-          id: booking.id,
-          booking_reference: booking.booking_reference,
-          customerName: booking.customers?.name || 'Unknown',
-          phone: booking.customers?.phone || 'No phone',
-          services: services,
-          date: format(new Date(booking.date), 'yyyy-MM-dd'),
-          time: booking.time,
-          status: booking.status,
-          totalAmount: formattedAmount,
-          location: booking.location,
-          notes: booking.notes || undefined,
-          customer_id: booking.customer_id || undefined
-        };
-      })
-    );
+          const services = serviceData?.map(item => item.services?.name || '') || [];
+          
+          const formattedAmount = new Intl.NumberFormat('en-UG', {
+            style: 'currency',
+            currency: 'UGX',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(booking.total_amount);
 
-    return bookingsWithServices;
+          return {
+            id: booking.id,
+            booking_reference: booking.booking_reference,
+            customerName: booking.customers?.name || 'Unknown',
+            phone: booking.customers?.phone || 'No phone',
+            services: services,
+            date: format(new Date(booking.date), 'yyyy-MM-dd'),
+            time: booking.time,
+            status: booking.status as BookingStatus,
+            totalAmount: formattedAmount,
+            location: booking.location,
+            notes: booking.notes || undefined,
+            customer_id: booking.customer_id || undefined
+          };
+        })
+      );
+
+      return bookingsWithServices;
+    } catch (error) {
+      console.error('Error in bookingsService.search:', error);
+      return [];
+    }
   },
 
   async getBookingsByDate(date: string): Promise<BookingWithDetails[]> {
@@ -433,7 +461,7 @@ export const bookingsService = {
           services: services,
           date: format(new Date(booking.date), 'yyyy-MM-dd'),
           time: booking.time,
-          status: booking.status,
+          status: booking.status as BookingStatus,
           totalAmount: formattedAmount,
           location: booking.location,
           notes: booking.notes || undefined,

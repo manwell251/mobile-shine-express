@@ -1,47 +1,30 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signIn, isLoading, isAuthenticated } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/admin/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate API request delay
-    setTimeout(() => {
-      // This is a mock implementation - in a real app, this would verify credentials with a backend
-      if (email === 'admin@klinride.com' && password === 'admin123') {
-        // Successful login
-        toast({
-          title: "Login successful",
-          description: "Welcome to the admin dashboard",
-        });
-        
-        // In a real app, you would set authentication state here
-        navigate('/admin/dashboard');
-      } else {
-        // Failed login
-        toast({
-          title: "Login failed",
-          description: "Invalid email or password",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-      }
-    }, 1000);
+    signIn(email, password);
   };
 
   return (
@@ -86,26 +69,6 @@ const AdminLogin = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-brand-blue focus:ring-brand-blue border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                Remember me
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <a href="#" className="font-medium text-brand-blue hover:text-brand-darkBlue">
-                Forgot your password?
-              </a>
-            </div>
-          </div>
-
           <Button 
             type="submit" 
             className="w-full" 
@@ -117,7 +80,7 @@ const AdminLogin = () => {
         
         <div className="mt-6 text-center text-sm">
           <p className="text-gray-500">
-            For testing, use email: admin@klinride.com and password: admin123
+            For testing, create a user in the Supabase authentication dashboard
           </p>
         </div>
       </Card>

@@ -1,5 +1,5 @@
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/types/database.types';
 
 export type Customer = Database['public']['Tables']['customers']['Row'];
@@ -12,66 +12,86 @@ export interface CustomerWithStats extends Customer {
   lastBooking: string;
 }
 
-export const customersService = {
+export const customerService = {
   async getAll(): Promise<CustomerWithStats[]> {
-    const { data: customers, error } = await supabase
-      .from('customers')
-      .select('*');
+    try {
+      const { data: customers, error } = await supabase
+        .from('customers')
+        .select('*');
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Get booking stats for each customer
-    const customersWithStats = await Promise.all(
-      customers.map(async (customer) => {
-        // Get count of bookings
-        const { count: bookingsCount, error: bookingsError } = await supabase
-          .from('bookings')
-          .select('*', { count: 'exact', head: true })
-          .eq('customer_id', customer.id);
+      if (!customers || customers.length === 0) {
+        return [];
+      }
 
-        if (bookingsError) throw bookingsError;
+      // Get booking stats for each customer
+      const customersWithStats = await Promise.all(
+        customers.map(async (customer) => {
+          try {
+            // Get count of bookings
+            const { count: bookingsCount } = await supabase
+              .from('bookings')
+              .select('*', { count: 'exact', head: true })
+              .eq('customer_id', customer.id);
 
-        // Get sum of booking amounts
-        const { data: bookings, error: amountError } = await supabase
-          .from('bookings')
-          .select('total_amount, date')
-          .eq('customer_id', customer.id)
-          .order('date', { ascending: false });
+            // Get sum of booking amounts
+            const { data: bookings } = await supabase
+              .from('bookings')
+              .select('total_amount, date')
+              .eq('customer_id', customer.id)
+              .order('date', { ascending: false });
 
-        if (amountError) throw amountError;
+            const totalSpent = bookings?.reduce((sum, booking) => sum + booking.total_amount, 0) || 0;
+            const lastBooking = bookings && bookings.length > 0 ? bookings[0].date : null;
 
-        const totalSpent = bookings.reduce((sum, booking) => sum + booking.total_amount, 0);
-        const lastBooking = bookings.length > 0 ? bookings[0].date : null;
+            // Format total spent as UGX currency
+            const formattedTotal = new Intl.NumberFormat('en-UG', {
+              style: 'currency',
+              currency: 'UGX',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(totalSpent);
 
-        // Format total spent as UGX currency
-        const formattedTotal = new Intl.NumberFormat('en-UG', {
-          style: 'currency',
-          currency: 'UGX',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        }).format(totalSpent);
+            return {
+              ...customer,
+              bookings: bookingsCount ?? 0,
+              totalSpent: formattedTotal,
+              lastBooking: lastBooking || ''
+            };
+          } catch (error) {
+            console.error(`Error processing stats for customer ${customer.id}:`, error);
+            return {
+              ...customer,
+              bookings: 0,
+              totalSpent: 'UGX 0',
+              lastBooking: ''
+            };
+          }
+        })
+      );
 
-        return {
-          ...customer,
-          bookings: bookingsCount ?? 0,
-          totalSpent: formattedTotal,
-          lastBooking: lastBooking || ''
-        };
-      })
-    );
-
-    return customersWithStats;
+      return customersWithStats;
+    } catch (error) {
+      console.error('Error in customerService.getAll:', error);
+      return [];
+    }
   },
 
   async getById(id: string): Promise<Customer | null> {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(`Error in customerService.getById(${id}):`, error);
+      return null;
+    }
   },
 
   async create(customer: CustomerInsert): Promise<Customer> {
@@ -107,46 +127,65 @@ export const customersService = {
   },
 
   async search(searchTerm: string): Promise<CustomerWithStats[]> {
-    const { data: customers, error } = await supabase
-      .from('customers')
-      .select('*')
-      .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
+    try {
+      const { data: customers, error } = await supabase
+        .from('customers')
+        .select('*')
+        .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Get booking stats for each customer (same as in getAll)
-    const customersWithStats = await Promise.all(
-      customers.map(async (customer) => {
-        const { count: bookingsCount } = await supabase
-          .from('bookings')
-          .select('*', { count: 'exact', head: true })
-          .eq('customer_id', customer.id);
+      if (!customers || customers.length === 0) {
+        return [];
+      }
 
-        const { data: bookings } = await supabase
-          .from('bookings')
-          .select('total_amount, date')
-          .eq('customer_id', customer.id)
-          .order('date', { ascending: false });
+      // Get booking stats for each customer (same as in getAll)
+      const customersWithStats = await Promise.all(
+        customers.map(async (customer) => {
+          try {
+            const { count: bookingsCount } = await supabase
+              .from('bookings')
+              .select('*', { count: 'exact', head: true })
+              .eq('customer_id', customer.id);
 
-        const totalSpent = bookings?.reduce((sum, booking) => sum + booking.total_amount, 0) || 0;
-        const lastBooking = bookings && bookings.length > 0 ? bookings[0].date : null;
+            const { data: bookings } = await supabase
+              .from('bookings')
+              .select('total_amount, date')
+              .eq('customer_id', customer.id)
+              .order('date', { ascending: false });
 
-        const formattedTotal = new Intl.NumberFormat('en-UG', {
-          style: 'currency',
-          currency: 'UGX',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        }).format(totalSpent);
+            const totalSpent = bookings?.reduce((sum, booking) => sum + booking.total_amount, 0) || 0;
+            const lastBooking = bookings && bookings.length > 0 ? bookings[0].date : null;
 
-        return {
-          ...customer,
-          bookings: bookingsCount ?? 0,
-          totalSpent: formattedTotal,
-          lastBooking: lastBooking || ''
-        };
-      })
-    );
+            const formattedTotal = new Intl.NumberFormat('en-UG', {
+              style: 'currency',
+              currency: 'UGX',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(totalSpent);
 
-    return customersWithStats;
+            return {
+              ...customer,
+              bookings: bookingsCount ?? 0,
+              totalSpent: formattedTotal,
+              lastBooking: lastBooking || ''
+            };
+          } catch (error) {
+            console.error(`Error processing stats for customer ${customer.id}:`, error);
+            return {
+              ...customer,
+              bookings: 0,
+              totalSpent: 'UGX 0',
+              lastBooking: ''
+            };
+          }
+        })
+      );
+
+      return customersWithStats;
+    } catch (error) {
+      console.error('Error in customerService.search:', error);
+      return [];
+    }
   }
 };

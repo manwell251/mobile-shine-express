@@ -8,14 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Search, User, Phone, Mail, Calendar, MapPin, FileSpreadsheet } from 'lucide-react';
-import { customersService, CustomerWithStats } from '@/services/customers';
+import { customerService, CustomerWithStats } from '@/services/customers';
 import { useToast } from '@/hooks/use-toast';
 import { exportToExcel } from '@/utils/export';
+import CustomerForm from '@/components/admin/customers/CustomerForm';
 
 const Customers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [customers, setCustomers] = useState<CustomerWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [stats, setStats] = useState({
     totalCustomers: 0,
     activeThisMonth: 0,
@@ -46,7 +48,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     try {
       setIsLoading(true);
-      const data = await customersService.getAll();
+      const data = await customerService.getAll();
       setCustomers(data);
       calculateStats(data);
     } catch (error) {
@@ -64,7 +66,7 @@ const Customers = () => {
   const searchCustomers = async (term: string) => {
     try {
       setIsLoading(true);
-      const data = await customersService.search(term);
+      const data = await customerService.search(term);
       setCustomers(data);
     } catch (error) {
       console.error('Error searching customers:', error);
@@ -157,12 +159,32 @@ const Customers = () => {
     }
   };
 
+  const handleDeleteCustomer = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this customer?")) {
+      try {
+        await customerService.delete(id);
+        toast({
+          title: "Customer Deleted",
+          description: "The customer has been successfully deleted"
+        });
+        fetchCustomers();
+      } catch (error) {
+        console.error('Error deleting customer:', error);
+        toast({
+          title: "Delete Failed",
+          description: "Failed to delete customer. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Customers</h1>
         <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-          <Button>
+          <Button onClick={() => setShowAddCustomer(true)}>
             <User className="mr-2" size={18} />
             Add New Customer
           </Button>
@@ -172,6 +194,15 @@ const Customers = () => {
           </Button>
         </div>
       </div>
+
+      {showAddCustomer && (
+        <div className="mb-6">
+          <CustomerForm 
+            onCancel={() => setShowAddCustomer(false)} 
+            onSuccess={fetchCustomers}
+          />
+        </div>
+      )}
 
       {/* Search and Stats */}
       <div className="mb-6">
@@ -244,7 +275,7 @@ const Customers = () => {
               ) : customers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-10">
-                    No customers found. Try adjusting your search.
+                    No customers found. Try adding a new customer or adjusting your search.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -281,10 +312,14 @@ const Customers = () => {
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button variant="ghost" size="sm">
-                          View Profile
+                          Edit
                         </Button>
-                        <Button variant="outline" size="sm">
-                          Book Service
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteCustomer(customer.id)}
+                        >
+                          Delete
                         </Button>
                       </div>
                     </TableCell>

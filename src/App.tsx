@@ -1,50 +1,62 @@
 
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Index from './pages/Index';
-import About from './pages/About';
-import Services from './pages/Services';
-import Contact from './pages/Contact';
-import Booking from './pages/Booking';
-import Pricing from './pages/Pricing';
-import NotFound from './pages/NotFound';
-import AdminLayout from './components/admin/AdminLayout';
-import Dashboard from './pages/admin/Dashboard';
-import Bookings from './pages/admin/Bookings';
-import Jobs from './pages/admin/Jobs';
-import Customers from './pages/admin/Customers';
-import Settings from './pages/admin/Settings';
-import AdminLogin from './pages/admin/Login';
-import Accounting from './pages/admin/Accounting';
-import { Toaster } from './components/ui/toaster';
+import Index from '@/pages/Index';
+import About from '@/pages/About';
+import Services from '@/pages/Services';
+import Pricing from '@/pages/Pricing';
+import Contact from '@/pages/Contact';
+import Booking from '@/pages/Booking';
+import NotFound from '@/pages/NotFound';
+
+// Admin Pages
+import Dashboard from '@/pages/admin/Dashboard';
+import Customers from '@/pages/admin/Customers';
+import Bookings from '@/pages/admin/Bookings';
+import Jobs from '@/pages/admin/Jobs';
+import Settings from '@/pages/admin/Settings';
+import Accounting from '@/pages/admin/Accounting';
+import AdminLayout from '@/components/admin/AdminLayout';
+import Login from '@/pages/admin/Login';
+
+// Auth Provider
+import { AuthProvider } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
+import './App.css';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Index />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/booking" element={<Booking />} />
-        <Route path="/pricing" element={<Pricing />} />
-
-        {/* Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="bookings" element={<Bookings />} />
-          <Route path="jobs" element={<Jobs />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="accounting" element={<Accounting />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <Toaster />
-    </Router>
+    <>
+      <Router>
+        <AuthProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/booking" element={<Booking />} />
+            
+            {/* Admin Login */}
+            <Route path="/admin/login" element={<Login />} />
+            
+            {/* Admin Routes */}
+            <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+              <Route path="/admin/dashboard" element={<Dashboard />} />
+              <Route path="/admin/customers" element={<Customers />} />
+              <Route path="/admin/bookings" element={<Bookings />} />
+              <Route path="/admin/jobs" element={<Jobs />} />
+              <Route path="/admin/accounting" element={<Accounting />} />
+              <Route path="/admin/settings" element={<Settings />} />
+            </Route>
+            
+            {/* Not Found */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
+      </Router>
+    </>
   );
 }
 
