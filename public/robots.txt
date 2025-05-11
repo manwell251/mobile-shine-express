@@ -1,14 +1,15 @@
-User-agent: Googlebot
-Allow: /
 
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# Allow crawling of public pages
 User-agent: *
 Allow: /
+Allow: /about
+Allow: /services
+Allow: /pricing
+Allow: /contact
+Allow: /booking
+Disallow: /admin/
+Disallow: /login/
+Disallow: /dashboard/
+
+# Sitemap location
+Sitemap: https://klinride.com/sitemap.xml

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -42,22 +43,22 @@ const PageHeroCarousel: React.FC<PageHeroCarouselProps> = ({
     ],
     about: [
       {
-        src: "/images/team-members.webp",
+        src: "car2.avif",
         alt: "Our professional team",
         caption: "Our dedicated team of car care specialists"
       },
       {
-        src: "/images/company-history.webp",
+        src: "car1.avif",
         alt: "Company history",
         caption: "Serving our community since our founding"
       },
       {
-        src: "/images/training.webp",
+        src: "home.png",
         alt: "Staff training",
         caption: "Continuous training to maintain the highest standards"
       },
       {
-        src: "/images/community-service.webp",
+        src: "carafter1.png",
         alt: "Community involvement",
         caption: "Giving back to our local community"
       }
@@ -90,16 +91,22 @@ const PageHeroCarousel: React.FC<PageHeroCarouselProps> = ({
   }, [autoSlideInterval]);
 
   // Different themes based on page type
-  const bgColor = pageType === 'services' ? 'bg-gradient-to-r from-blue-50 to-gray-50' : 'bg-gradient-to-r from-gray-50 to-blue-50';
   const titleText = pageType === 'services' 
     ? 'Experience Quality Car Care' 
     : 'Our Professional Team at Work';
   
   return (
-    <section className={`py-10 bg-brand-lightBlue`}>
-      <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-2">{titleText}</h2>
-        <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">
+    <section className="relative py-16 bg-gradient-to-b from-brand-blue/90 to-brand-blue/70 text-white overflow-hidden">
+      {/* Abstract shapes for background */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-10 left-10 w-64 h-64 rounded-full bg-white"></div>
+        <div className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-white"></div>
+        <div className="absolute top-1/2 left-1/3 w-40 h-40 rounded-full bg-white"></div>
+      </div>
+      
+      <div className="container mx-auto px-4 relative z-10">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">{titleText}</h2>
+        <p className="text-white/90 text-lg md:text-xl text-center mb-10 max-w-3xl mx-auto">
           {pageType === 'services' 
             ? 'Professional mobile car wash services designed to keep your vehicle looking pristine — wherever you are.'
             : 'Dedicated professionals with a passion for making your vehicle shine.'
@@ -107,10 +114,10 @@ const PageHeroCarousel: React.FC<PageHeroCarouselProps> = ({
         </p>
         
         <div className="relative max-w-5xl mx-auto">
-          {/* Main carousel */}
-          <div className="overflow-hidden rounded-xl shadow-2xl bg-blue-50/70">
+          {/* Main carousel with glass effect */}
+          <div className="overflow-hidden rounded-xl shadow-2xl backdrop-blur-sm bg-white/10 border border-white/20">
             <div 
-              className="flex transition-transform duration-500 ease-in-out h-[300px] md:h-[400px]"
+              className="flex transition-transform duration-500 ease-in-out h-[300px] md:h-[500px]"
               style={{ transform: `translateX(-${currentIndex * 100}%)` }}
             >
               {images.map((image, index) => (
@@ -124,8 +131,8 @@ const PageHeroCarousel: React.FC<PageHeroCarouselProps> = ({
                     className="w-full h-full object-cover"
                   />
                   {image.caption && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white p-4">
-                      <p className="text-lg font-medium">{image.caption}</p>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent text-white p-6 backdrop-blur-sm">
+                      <p className="text-lg md:text-xl font-medium">{image.caption}</p>
                     </div>
                   )}
                 </div>
@@ -133,25 +140,25 @@ const PageHeroCarousel: React.FC<PageHeroCarouselProps> = ({
             </div>
           </div>
           
-          {/* Navigation buttons */}
+          {/* Navigation buttons with improved design */}
           <button 
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 p-2 rounded-full shadow-md hover:bg-opacity-100 transition-all"
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-md p-3 rounded-full shadow-lg hover:bg-white/40 transition-all border border-white/30"
             aria-label="Previous slide"
           >
-            <ChevronLeft size={24} className="text-brand-blue" />
+            <ChevronLeft size={24} className="text-white" />
           </button>
           
           <button 
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 p-2 rounded-full shadow-md hover:bg-opacity-100 transition-all"
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-md p-3 rounded-full shadow-lg hover:bg-white/40 transition-all border border-white/30"
             aria-label="Next slide"
           >
-            <ChevronRight size={24} className="text-brand-blue" />
+            <ChevronRight size={24} className="text-white" />
           </button>
           
-          {/* Indicators */}
-          <div className="flex justify-center mt-4 space-x-2">
+          {/* Indicators with improved design */}
+          <div className="flex justify-center mt-6 space-x-3">
             {images.map((_, index) => (
               <button
                 key={index}
@@ -160,8 +167,10 @@ const PageHeroCarousel: React.FC<PageHeroCarouselProps> = ({
                   setCurrentIndex(index);
                   setTimeout(() => setIsTransitioning(false), 500);
                 }}
-                className={`w-3 h-3 rounded-full ${
-                  index === currentIndex ? 'bg-brand-blue' : 'bg-gray-300'
+                className={`w-3 h-3 rounded-full transition-all ${
+                  index === currentIndex 
+                    ? 'bg-white scale-110' 
+                    : 'bg-white/40 hover:bg-white/70'
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
               />

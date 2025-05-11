@@ -1,9 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, Clock, DollarSign, Users } from 'lucide-react';
+import { Calendar, Clock, DollarSign, Users, LogOut } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { dashboardService } from '@/services/dashboard';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -14,6 +18,8 @@ const Dashboard = () => {
     totalCustomers: 0
   });
   const [upcomingBookings, setUpcomingBookings] = useState([]);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -41,6 +47,24 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out."
+      });
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const statsItems = [
     { title: 'Bookings Today', value: stats.bookingsToday.toString(), icon: <Calendar className="text-brand-blue" size={24} /> },
     { title: 'Pending Jobs', value: stats.pendingJobs.toString(), icon: <Clock className="text-amber-500" size={24} /> },
@@ -50,7 +74,12 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6">Dashboard</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+        <Button variant="outline" onClick={handleLogout}>
+          <LogOut size={16} className="mr-2" /> Logout
+        </Button>
+      </div>
       
       {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -67,8 +96,8 @@ const Dashboard = () => {
           ))
         ) : (
           statsItems.map((stat, index) => (
-            <Card key={index} className="p-4 flex flex-row items-center">
-              <div className="mr-4 bg-gray-100 p-3 rounded-full">
+            <Card key={index} className="p-6 flex flex-row items-center">
+              <div className="mr-4 bg-gray-100 p-4 rounded-full">
                 {stat.icon}
               </div>
               <div>
@@ -109,7 +138,7 @@ const Dashboard = () => {
               ) : upcomingBookings.length > 0 ? (
                 upcomingBookings.map((booking) => (
                   <TableRow key={booking.id}>
-                    <TableCell className="font-medium">{booking.id}</TableCell>
+                    <TableCell className="font-medium">{booking.id.substring(0, 8)}</TableCell>
                     <TableCell>{booking.customerName}</TableCell>
                     <TableCell>{booking.service}</TableCell>
                     <TableCell>{booking.time}</TableCell>
@@ -130,7 +159,22 @@ const Dashboard = () => {
         </div>
       </Card>
       
-      {/* Recent Activities & Performance Charts would be added here */}
+      {/* Quick Actions */}
+      <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/bookings')}>
+          <h3 className="font-bold text-lg mb-2">Manage Bookings</h3>
+          <p className="text-gray-600">View and manage all customer bookings</p>
+        </Card>
+        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/jobs')}>
+          <h3 className="font-bold text-lg mb-2">Manage Jobs</h3>
+          <p className="text-gray-600">Track and update job statuses</p>
+        </Card>
+        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/customers')}>
+          <h3 className="font-bold text-lg mb-2">View Customers</h3>
+          <p className="text-gray-600">Access your customer database</p>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -245,6 +245,111 @@ export const jobsService = {
     return data;
   },
 
+  async createFromBooking(bookingId: string, technicianId?: string): Promise<JobRow> {
+    try {
+      // First get the booking
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+        
+      if (bookingError) throw bookingError;
+      if (!booking) throw new Error('Booking not found');
+
+      // Format the date string to a valid date format
+      const jobDate = new Date(booking.date);
+      
+      // Create job
+      const job: JobInsert = {
+        booking_id: bookingId,
+        date: format(jobDate, 'yyyy-MM-dd'),
+        technician_id: technicianId || null,
+        status: 'Scheduled',
+        notes: booking.notes || null,
+      };
+      
+      const { data: newJob, error: jobError } = await supabase
+        .from('jobs')
+        .insert(job)
+        .select()
+        .single();
+        
+      if (jobError) throw jobError;
+      if (!newJob) throw new Error('Failed to create job');
+      
+      // Add services to job_services
+      const { data: bookingServices, error: servicesError } = await supabase
+        .from('booking_services')
+        .select('service_id, price_at_booking, quantity')
+        .eq('booking_id', bookingId);
+        
+      if (servicesError) throw servicesError;
+      
+      if (bookingServices && bookingServices.length > 0) {
+        const jobServices = bookingServices.map(service => ({
+          job_id: newJob.id,
+          service_id: service.service_id,
+          price: service.price_at_booking,
+          quantity: service.quantity || 1
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('job_services')
+          .insert(jobServices);
+          
+        if (insertError) throw insertError;
+      }
+      
+      return newJob;
+    } catch (error) {
+      console.error('Error creating job from booking:', error);
+      throw error;
+    }
+  },
+  
+  async autoCreateJobsFromScheduledBookings(): Promise<number> {
+    try {
+      // Get scheduled bookings that don't have jobs
+      const { data: scheduledBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          date
+        `)
+        .eq('status', 'Scheduled')
+        .order('date', { ascending: true });
+        
+      if (bookingsError) throw bookingsError;
+      
+      if (!scheduledBookings || scheduledBookings.length === 0) return 0;
+      
+      // Check which bookings don't have jobs yet
+      let jobsCreated = 0;
+      
+      for (const booking of scheduledBookings) {
+        // Check if job exists for this booking
+        const { count, error: countError } = await supabase
+          .from('jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('booking_id', booking.id);
+          
+        if (countError) throw countError;
+        
+        // If no job exists, create one
+        if (count === 0) {
+          await this.createFromBooking(booking.id);
+          jobsCreated++;
+        }
+      }
+      
+      return jobsCreated;
+    } catch (error) {
+      console.error('Error auto-creating jobs:', error);
+      throw error;
+    }
+  },
+
   async update(id: string, job: JobUpdate): Promise<JobRow> {
     const { data, error } = await supabase
       .from('jobs')

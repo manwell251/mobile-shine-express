@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, LogOut } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import BookingForm from '@/components/admin/BookingForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,15 +11,20 @@ import BookingCalendarView from '@/components/admin/bookings/BookingCalendarView
 import BookingFilters from '@/components/admin/bookings/BookingFilters';
 import { bookingsService, BookingWithDetails } from '@/services/bookings';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 const Bookings = () => {
   const [showAddBooking, setShowAddBooking] = useState(false);
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const [editingBooking, setEditingBooking] = useState<BookingWithDetails | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchBookings();
@@ -35,6 +40,35 @@ const Bookings = () => {
       clearTimeout(handler);
     };
   }, [searchTerm]);
+
+  // Handle editing
+  useEffect(() => {
+    if (editingBookingId) {
+      fetchBookingDetails(editingBookingId);
+    }
+  }, [editingBookingId]);
+
+  const fetchBookingDetails = async (id: string) => {
+    try {
+      const booking = await bookingsService.getById(id);
+      if (booking) {
+        setEditingBooking(booking);
+      } else {
+        toast({
+          title: "Error",
+          description: "Could not find booking details",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching booking details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load booking details",
+        variant: "destructive"
+      });
+    }
+  };
 
   const fetchBookings = async () => {
     try {
@@ -73,7 +107,18 @@ const Bookings = () => {
 
   const handleBookingSuccess = () => {
     setShowAddBooking(false);
+    setEditingBookingId(null);
+    setEditingBooking(null);
     fetchBookings();
+  };
+
+  const handleEditBooking = (id: string) => {
+    setEditingBookingId(id);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBookingId(null);
+    setEditingBooking(null);
   };
 
   const handleDeleteBooking = async (id: string) => {
@@ -94,16 +139,41 @@ const Bookings = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out."
+      });
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Bookings</h1>
-        <Button 
-          className="mt-4 md:mt-0" 
-          onClick={() => setShowAddBooking(true)}
-        >
-          <Plus size={16} className="mr-2" /> Add Booking
-        </Button>
+        <div className="flex mt-4 md:mt-0 space-x-2">
+          <Button 
+            onClick={() => setShowAddBooking(true)}
+          >
+            <Plus size={16} className="mr-2" /> Add Booking
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={handleLogout}
+          >
+            <LogOut size={16} className="mr-2" /> Logout
+          </Button>
+        </div>
       </div>
 
       {showAddBooking && (
@@ -112,6 +182,17 @@ const Bookings = () => {
           <BookingForm 
             onCancel={() => setShowAddBooking(false)} 
             onSuccess={handleBookingSuccess}
+          />
+        </Card>
+      )}
+
+      {editingBookingId && editingBooking && (
+        <Card className="p-4 mb-6">
+          <h2 className="text-xl font-bold mb-4">Edit Booking</h2>
+          <BookingForm 
+            onCancel={handleCancelEdit} 
+            onSuccess={handleBookingSuccess}
+            existingBooking={editingBooking}
           />
         </Card>
       )}
@@ -138,6 +219,7 @@ const Bookings = () => {
             getStatusClass={getStatusClass}
             isLoading={isLoading}
             onDelete={handleDeleteBooking}
+            onEdit={handleEditBooking}
             onStatusChange={async (id: string, status: string) => {
               try {
                 await bookingsService.updateStatus(id, status as any);

@@ -9,12 +9,15 @@ import JobsTable from '@/components/admin/jobs/JobsTable';
 import { jobsService } from '@/services/jobs';
 import { exportToExcel } from '@/utils/export';
 import { useNavigate } from 'react-router-dom';
+import { LogOut, RefreshCcw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingJobs, setIsCreatingJobs] = useState(false);
   const [sortBy, setSortBy] = useState<string>('date-desc');
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -79,6 +82,35 @@ const Jobs = () => {
     };
   }, [searchTerm]);
 
+  const handleCreateJobsFromBookings = async () => {
+    try {
+      setIsCreatingJobs(true);
+      const count = await jobsService.autoCreateJobsFromScheduledBookings();
+      
+      if (count > 0) {
+        toast({
+          title: "Success",
+          description: `Created ${count} new job${count > 1 ? 's' : ''} from scheduled bookings.`
+        });
+        fetchJobs();
+      } else {
+        toast({
+          title: "Information",
+          description: "No new jobs created. All scheduled bookings already have associated jobs."
+        });
+      }
+    } catch (error) {
+      console.error('Error creating jobs from bookings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create jobs from bookings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingJobs(false);
+    }
+  };
+
   const handleExportData = () => {
     try {
       const exportData = jobs.map(job => ({
@@ -117,6 +149,24 @@ const Jobs = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out."
+      });
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Filter jobs based on search term (we handle this on the server now)
   const filteredJobs = jobs;
 
@@ -125,6 +175,15 @@ const Jobs = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Jobs Management</h1>
         <div className="mt-4 md:mt-0 flex flex-col sm:flex-row gap-2">
+          <Button 
+            onClick={handleCreateJobsFromBookings}
+            disabled={isCreatingJobs}
+            className="mr-2"
+          >
+            <RefreshCcw size={16} className={`mr-2 ${isCreatingJobs ? 'animate-spin' : ''}`} />
+            {isCreatingJobs ? 'Creating Jobs...' : 'Create Jobs from Bookings'}
+          </Button>
+          
           <Select 
             value={sortBy}
             onValueChange={setSortBy}
@@ -143,6 +202,9 @@ const Jobs = () => {
             </SelectContent>
           </Select>
           <Button onClick={handleExportData}>Export Data</Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut size={16} className="mr-2" /> Logout
+          </Button>
         </div>
       </div>
 
@@ -161,7 +223,8 @@ const Jobs = () => {
       {/* Jobs Table */}
       <JobsTable 
         jobs={filteredJobs} 
-        isLoading={isLoading} 
+        isLoading={isLoading}
+        onRefresh={fetchJobs}
       />
     </div>
   );
