@@ -49,11 +49,11 @@ export const jobsService = {
         if (!job.booking_id) {
           return {
             id: job.id,
-            job_reference: job.job_reference,
+            job_reference: job.job_reference || 'No Reference',
             bookingId: 'No Booking',
             customerName: 'Unknown',
             services: [],
-            date: format(new Date(job.date), 'yyyy-MM-dd'),
+            date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
             status: job.status as any,
             amount: 'UGX 0',
             technician: job.technicians?.name || 'Unassigned',
@@ -62,10 +62,11 @@ export const jobsService = {
           };
         }
 
+        // Get services for this booking
         const { data: serviceData } = await supabase
-          .from('job_services')
+          .from('booking_services')
           .select('*, services(name)')
-          .eq('job_id', job.id);
+          .eq('booking_id', job.booking_id);
 
         const services = serviceData?.map(item => item.services?.name || '') || [];
 
@@ -78,11 +79,11 @@ export const jobsService = {
 
         return {
           id: job.id,
-          job_reference: job.job_reference,
+          job_reference: job.job_reference || 'No Reference',
           bookingId: job.bookings?.booking_reference || 'No Booking',
           customerName: job.bookings?.customers?.name || 'Unknown',
           services: services,
-          date: format(new Date(job.date), 'yyyy-MM-dd'),
+          date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
           status: job.status as any,
           amount: formattedAmount,
           technician: job.technicians?.name || 'Unassigned',
@@ -129,11 +130,11 @@ export const jobsService = {
         if (!job.booking_id) {
           return {
             id: job.id,
-            job_reference: job.job_reference,
+            job_reference: job.job_reference || 'No Reference',
             bookingId: 'No Booking',
             customerName: 'Unknown',
             services: [],
-            date: format(new Date(job.date), 'yyyy-MM-dd'),
+            date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
             status: job.status as any,
             amount: 'UGX 0',
             technician: job.technicians?.name || 'Unassigned',
@@ -142,10 +143,11 @@ export const jobsService = {
           };
         }
 
+        // Get services for this booking
         const { data: serviceData } = await supabase
-          .from('job_services')
+          .from('booking_services')
           .select('*, services(name)')
-          .eq('job_id', job.id);
+          .eq('booking_id', job.booking_id);
 
         const services = serviceData?.map(item => item.services?.name || '') || [];
 
@@ -158,11 +160,11 @@ export const jobsService = {
 
         return {
           id: job.id,
-          job_reference: job.job_reference,
+          job_reference: job.job_reference || 'No Reference',
           bookingId: job.bookings?.booking_reference || 'No Booking',
           customerName: job.bookings?.customers?.name || 'Unknown',
           services: services,
-          date: format(new Date(job.date), 'yyyy-MM-dd'),
+          date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
           status: job.status as any,
           amount: formattedAmount,
           technician: job.technicians?.name || 'Unassigned',
@@ -199,17 +201,15 @@ export const jobsService = {
     if (error) throw error;
     if (!job) return null;
 
-    // Fetch services for this job's booking
+    // Get services for this booking
     let serviceNames: string[] = [];
     if (job.booking_id) {
       const { data: serviceData } = await supabase
-        .from('job_services')
+        .from('booking_services')
         .select('*, services(name)')
-        .eq('job_id', job.id);
+        .eq('booking_id', job.booking_id);
 
-      const services = serviceData?.map(item => item.services?.name || '') || [];
-
-      serviceNames = services;
+      serviceNames = serviceData?.map(item => item.services?.name || '') || [];
     }
 
     const formattedAmount = new Intl.NumberFormat('en-UG', {
@@ -221,11 +221,11 @@ export const jobsService = {
 
     return {
       id: job.id,
-      job_reference: job.job_reference,
+      job_reference: job.job_reference || 'No Reference',
       bookingId: job.bookings?.booking_reference || 'No Booking',
       customerName: job.bookings?.customers?.name || 'Unknown',
       services: serviceNames,
-      date: format(new Date(job.date), 'yyyy-MM-dd'),
+      date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
       status: job.status as any,
       amount: formattedAmount,
       technician: job.technicians?.name || 'Unassigned',
@@ -267,6 +267,7 @@ export const jobsService = {
         technician_id: technicianId || null,
         status: 'Scheduled',
         notes: booking.notes || null,
+        job_reference: `J${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}` // Temporary reference
       };
       
       const { data: newJob, error: jobError } = await supabase
@@ -417,11 +418,11 @@ export const jobsService = {
         if (!job.booking_id) {
           return {
             id: job.id,
-            job_reference: job.job_reference,
+            job_reference: job.job_reference || 'No Reference',
             bookingId: 'No Booking',
             customerName: 'Unknown',
             services: [],
-            date: format(new Date(job.date), 'yyyy-MM-dd'),
+            date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
             status: job.status as any,
             amount: 'UGX 0',
             technician: job.technicians?.name || 'Unassigned',
@@ -431,9 +432,9 @@ export const jobsService = {
         }
 
         const { data: serviceData } = await supabase
-          .from('job_services')
+          .from('booking_services')
           .select('*, services(name)')
-          .eq('job_id', job.id);
+          .eq('booking_id', job.booking_id);
 
         const services = serviceData?.map(item => item.services?.name || '') || [];
 
@@ -446,11 +447,11 @@ export const jobsService = {
 
         return {
           id: job.id,
-          job_reference: job.job_reference,
+          job_reference: job.job_reference || 'No Reference',
           bookingId: job.bookings?.booking_reference || 'No Booking',
           customerName: job.bookings?.customers?.name || 'Unknown',
           services: services,
-          date: format(new Date(job.date), 'yyyy-MM-dd'),
+          date: job.date ? format(new Date(job.date), 'yyyy-MM-dd') : 'No Date',
           status: job.status as any,
           amount: formattedAmount,
           technician: job.technicians?.name || 'Unassigned',

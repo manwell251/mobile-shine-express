@@ -100,9 +100,9 @@ export const dashboardService = {
       let totalRevenue = 0;
       if (monthlyRevenueData && monthlyRevenueData.length > 0) {
         totalRevenue = monthlyRevenueData.reduce((sum, job) => {
-          // Fixed TypeScript error by checking if bookings exists first
+          // Fixed TypeScript error by properly checking and accessing the total_amount property
           if (job.bookings && typeof job.bookings.total_amount === 'number') {
-            return sum + Number(job.bookings.total_amount);
+            return sum + job.bookings.total_amount;
           }
           return sum;
         }, 0);
@@ -164,7 +164,7 @@ export const dashboardService = {
       // Map bookings to the desired format
       const upcomingBookings = [];
       for (const booking of bookings) {
-        // Fixed TypeScript error by checking if customers exists first
+        // Fixed TypeScript error by properly checking the customers property
         const customerName = booking.customers ? booking.customers.name : 'Unknown';
 
         // Get services for this booking

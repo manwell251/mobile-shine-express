@@ -1,28 +1,44 @@
 
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { ReactNode, useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [hasValidSession, setHasValidSession] = useState(false);
 
-  if (isLoading) {
-    // You could return a loading spinner here
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setHasValidSession(!!session);
+      setSessionChecked(true);
+    };
+    
+    checkSession();
+  }, []);
+
+  // Show nothing while we check authentication
+  if (loading || !sessionChecked) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
+  // If not authenticated, redirect to login
+  if (!user && !hasValidSession) {
+    return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
+  // If authenticated, render the protected content
   return <>{children}</>;
 };
 

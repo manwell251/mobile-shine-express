@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, LogOut } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import BookingForm from '@/components/admin/BookingForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,8 +11,7 @@ import BookingCalendarView from '@/components/admin/bookings/BookingCalendarView
 import BookingFilters from '@/components/admin/bookings/BookingFilters';
 import { bookingsService, BookingWithDetails } from '@/services/bookings';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const Bookings = () => {
   const [showAddBooking, setShowAddBooking] = useState(false);
@@ -22,13 +21,24 @@ const Bookings = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<{ start: string | null; end: string | null }>({
+    start: null,
+    end: null
+  });
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
+    // Check if we should edit a booking from URL params
+    const editId = searchParams.get('edit');
+    if (editId) {
+      setEditingBookingId(editId);
+    }
+    
     fetchBookings();
-  }, [statusFilter]);
+  }, [statusFilter, searchParams]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -40,6 +50,13 @@ const Bookings = () => {
       clearTimeout(handler);
     };
   }, [searchTerm]);
+
+  // Handle date range change
+  useEffect(() => {
+    if (dateRange.start && dateRange.end) {
+      fetchBookingsByDateRange();
+    }
+  }, [dateRange]);
 
   // Handle editing
   useEffect(() => {
@@ -94,6 +111,25 @@ const Bookings = () => {
     }
   };
 
+  const fetchBookingsByDateRange = async () => {
+    if (dateRange.start && dateRange.end) {
+      try {
+        setIsLoading(true);
+        const fetchedBookings = await bookingsService.getByDateRange(dateRange.start, dateRange.end);
+        setBookings(fetchedBookings);
+      } catch (error) {
+        console.error('Error fetching bookings by date range:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load bookings for selected date range.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   const getStatusClass = (status: string) => {
     switch(status) {
       case 'Draft': return 'bg-gray-100 text-gray-700';
@@ -109,16 +145,33 @@ const Bookings = () => {
     setShowAddBooking(false);
     setEditingBookingId(null);
     setEditingBooking(null);
+    
+    // Clear edit parameter from URL if it exists
+    if (searchParams.has('edit')) {
+      searchParams.delete('edit');
+      setSearchParams(searchParams);
+    }
+    
     fetchBookings();
   };
 
   const handleEditBooking = (id: string) => {
+    // Set the edit parameter in the URL
+    searchParams.set('edit', id);
+    setSearchParams(searchParams);
+    
     setEditingBookingId(id);
   };
 
   const handleCancelEdit = () => {
     setEditingBookingId(null);
     setEditingBooking(null);
+    
+    // Clear edit parameter from URL if it exists
+    if (searchParams.has('edit')) {
+      searchParams.delete('edit');
+      setSearchParams(searchParams);
+    }
   };
 
   const handleDeleteBooking = async (id: string) => {
@@ -139,24 +192,6 @@ const Bookings = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out."
-      });
-      navigate('/admin/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
@@ -166,12 +201,6 @@ const Bookings = () => {
             onClick={() => setShowAddBooking(true)}
           >
             <Plus size={16} className="mr-2" /> Add Booking
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} className="mr-2" /> Logout
           </Button>
         </div>
       </div>
@@ -211,6 +240,8 @@ const Bookings = () => {
             setSearchTerm={setSearchTerm}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
           />
 
           {/* Bookings Table */}
@@ -241,7 +272,10 @@ const Bookings = () => {
         </TabsContent>
         
         <TabsContent value="calendar">
-          <BookingCalendarView bookings={bookings} />
+          <BookingCalendarView 
+            bookings={bookings} 
+            onBookingClick={(bookingId) => handleEditBooking(bookingId)}
+          />
         </TabsContent>
       </Tabs>
     </div>

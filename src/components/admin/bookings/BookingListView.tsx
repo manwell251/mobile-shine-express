@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Calendar as CalendarIcon, Clock, Edit, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Edit, Trash2, Eye } from 'lucide-react';
 import { BookingWithDetails } from '@/services/bookings';
 import { 
   AlertDialog,
@@ -25,7 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from "@/components/ui/dialog";
 import { BookingStatus } from '@/types/booking';
+import { Badge } from "@/components/ui/badge";
 
 interface BookingListViewProps {
   bookings: BookingWithDetails[];
@@ -47,6 +55,8 @@ const BookingListView: React.FC<BookingListViewProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState<string | null>(null);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState<string | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   
   const statusOptions: BookingStatus[] = ["Draft", "Scheduled", "InProgress", "Completed", "Cancelled"];
 
@@ -72,6 +82,11 @@ const BookingListView: React.FC<BookingListViewProps> = ({
         setStatusUpdateLoading(null);
       }
     }
+  };
+
+  const showDetails = (booking: BookingWithDetails) => {
+    setSelectedBooking(booking);
+    setDetailsDialogOpen(true);
   };
 
   return (
@@ -132,11 +147,15 @@ const BookingListView: React.FC<BookingListViewProps> = ({
                       </div>
                     </TableCell>
                     <TableCell>
-                      {booking.services.map((service, idx) => (
-                        <div key={idx} className="text-sm">
-                          {service}
-                        </div>
-                      ))}
+                      {booking.services && booking.services.length > 0 ? (
+                        booking.services.map((service, idx) => (
+                          <div key={idx} className="text-sm">
+                            {service}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-400">No services</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="whitespace-nowrap">
@@ -175,6 +194,14 @@ const BookingListView: React.FC<BookingListViewProps> = ({
                     <TableCell>{booking.totalAmount}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => showDetails(booking)}
+                        >
+                          <Eye size={16} className="mr-1" />
+                          View
+                        </Button>
                         {onEdit && (
                           <Button 
                             variant="ghost" 
@@ -223,6 +250,83 @@ const BookingListView: React.FC<BookingListViewProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Booking Details Dialog */}
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Booking Details</DialogTitle>
+            <DialogDescription>
+              Reference: {selectedBooking?.booking_reference}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Customer</h3>
+                  <p className="font-medium">{selectedBooking.customerName}</p>
+                  <p className="text-sm">{selectedBooking.phone}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Status</h3>
+                  <span className={`inline-block px-2 py-1 mt-1 text-xs rounded-full ${getStatusClass(selectedBooking.status)}`}>
+                    {selectedBooking.status}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Date & Time</h3>
+                  <p>{selectedBooking.date} at {selectedBooking.time}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Amount</h3>
+                  <p className="font-medium">{selectedBooking.totalAmount}</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Services</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedBooking.services && selectedBooking.services.length > 0 ? (
+                    selectedBooking.services.map((service, idx) => (
+                      <Badge key={idx} variant="secondary">{service}</Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-400">No services added</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Location</h3>
+                <p>{selectedBooking.location}</p>
+              </div>
+
+              {selectedBooking.notes && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">Notes</h3>
+                  <p className="text-sm">{selectedBooking.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-2 pt-4">
+                {onEdit && (
+                  <Button 
+                    onClick={() => {
+                      setDetailsDialogOpen(false);
+                      onEdit(selectedBooking.id);
+                    }}
+                  >
+                    <Edit size={16} className="mr-2" />
+                    Edit Booking
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

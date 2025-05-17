@@ -7,6 +7,7 @@ import { dashboardService } from '@/services/dashboard';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { jobsService } from '@/services/jobs';
 
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,6 +25,20 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
+        
+        // Auto-create jobs from any scheduled bookings without jobs
+        try {
+          const jobsCreated = await jobsService.autoCreateJobsFromScheduledBookings();
+          if (jobsCreated > 0) {
+            toast({
+              title: "Jobs Created",
+              description: `${jobsCreated} new job(s) created from scheduled bookings.`
+            });
+          }
+        } catch (error) {
+          console.error('Error creating jobs from bookings:', error);
+        }
+        
         // Fetch stats
         const dashboardStats = await dashboardService.getStats();
         setStats({

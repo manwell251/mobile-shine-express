@@ -1,5 +1,4 @@
-
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/database.types';
 import { format } from 'date-fns';
 import { BookingStatus, BookingInsert, BookingUpdate } from '@/types/booking';
@@ -11,6 +10,7 @@ export interface BookingWithDetails {
   customerName: string;
   phone: string;
   services: string[];
+  serviceIds?: string[];
   date: string;
   time: string;
   status: BookingStatus;
@@ -18,9 +18,15 @@ export interface BookingWithDetails {
   location: string;
   notes?: string | null;
   customer_id?: string | null;
+  vehicle?: {
+    make: string;
+    model: string;
+    year: string;
+  };
+  email?: string;
 }
 
-function formatBookingData(booking: any, services: string[]): BookingWithDetails {
+function formatBookingData(booking: any, services: string[], serviceIds: string[] = []): BookingWithDetails {
   const formattedAmount = new Intl.NumberFormat('en-UG', {
     style: 'currency',
     currency: 'UGX',
@@ -33,29 +39,39 @@ function formatBookingData(booking: any, services: string[]): BookingWithDetails
     booking_reference: booking.booking_reference,
     customerName: booking.customers?.name || 'Unknown',
     phone: booking.customers?.phone || 'No phone',
+    email: booking.customers?.email,
     services: services,
+    serviceIds: serviceIds,
     date: format(new Date(booking.date), 'yyyy-MM-dd'),
     time: booking.time,
     status: booking.status as BookingStatus,
     totalAmount: formattedAmount,
     location: booking.location,
     notes: booking.notes || undefined,
-    customer_id: booking.customer_id || undefined
+    customer_id: booking.customer_id || undefined,
+    vehicle: {
+      make: "Not specified",
+      model: "Not specified",
+      year: "Not specified"
+    }
   };
 }
 
-async function fetchBookingServices(bookingId: string): Promise<string[]> {
+async function fetchBookingServices(bookingId: string): Promise<{ names: string[], ids: string[] }> {
   const { data: serviceData, error } = await supabase
     .from('booking_services')
-    .select('*, services(name)')
+    .select('*, services(id, name)')
     .eq('booking_id', bookingId);
 
   if (error) {
     console.error('Error fetching booking services:', error);
-    return [];
+    return { names: [], ids: [] };
   }
 
-  return serviceData?.map(item => item.services?.name || '') || [];
+  const names = serviceData?.map(item => item.services?.name || '') || [];
+  const ids = serviceData?.map(item => item.services?.id || '') || [];
+
+  return { names, ids };
 }
 
 export const bookingsService = {
@@ -82,7 +98,8 @@ export const bookingsService = {
           *,
           customers (
             name,
-            phone
+            phone,
+            email
           )
         `);
 
@@ -95,8 +112,8 @@ export const bookingsService = {
       // For each booking, fetch the associated services
       const bookingsWithServices = await Promise.all(
         bookings.map(async (booking) => {
-          const services = await fetchBookingServices(booking.id);
-          return formatBookingData(booking, services);
+          const { names, ids } = await fetchBookingServices(booking.id);
+          return formatBookingData(booking, names, ids);
         })
       );
 
@@ -121,7 +138,8 @@ export const bookingsService = {
           *,
           customers (
             name,
-            phone
+            phone,
+            email
           )
         `)
         .eq('status', status);
@@ -135,8 +153,8 @@ export const bookingsService = {
       // For each booking, fetch the associated services
       const bookingsWithServices = await Promise.all(
         bookings.map(async (booking) => {
-          const services = await fetchBookingServices(booking.id);
-          return formatBookingData(booking, services);
+          const { names, ids } = await fetchBookingServices(booking.id);
+          return formatBookingData(booking, names, ids);
         })
       );
 
@@ -155,7 +173,8 @@ export const bookingsService = {
           *,
           customers (
             name,
-            phone
+            phone,
+            email
           )
         `)
         .gte('date', startDate)
@@ -166,8 +185,8 @@ export const bookingsService = {
       // Process bookings the same way as in getAll
       const bookingsWithServices = await Promise.all(
         bookings.map(async (booking) => {
-          const services = await fetchBookingServices(booking.id);
-          return formatBookingData(booking, services);
+          const { names, ids } = await fetchBookingServices(booking.id);
+          return formatBookingData(booking, names, ids);
         })
       );
 
@@ -186,7 +205,8 @@ export const bookingsService = {
           *,
           customers (
             name,
-            phone
+            phone,
+            email
           )
         `)
         .eq('id', id)
@@ -195,8 +215,8 @@ export const bookingsService = {
       if (error) throw error;
       if (!booking) return null;
 
-      const services = await fetchBookingServices(booking.id);
-      return formatBookingData(booking, services);
+      const { names, ids } = await fetchBookingServices(booking.id);
+      return formatBookingData(booking, names, ids);
     } catch (error) {
       console.error('Error in bookingsService.getById:', error);
       return null;
@@ -244,6 +264,17 @@ export const bookingsService = {
           });
 
         if (bookingServiceError) throw bookingServiceError;
+      }
+
+      // If booking status is Scheduled, auto-create a job
+      if (booking.status === 'Scheduled') {
+        try {
+          const { jobsService } = await import('@/services/jobs');
+          await jobsService.createFromBooking(data.id);
+        } catch (jobError) {
+          console.error('Error creating job for booking:', jobError);
+          // We don't want to fail the booking creation if job creation fails
+        }
       }
 
       return data;
@@ -300,8 +331,43 @@ export const bookingsService = {
 
           if (bookingServiceError) throw bookingServiceError;
         }
+
+        // Update total amount
+        const totalAmount = selectedServices.reduce(async (promisedSum, serviceId) => {
+          const sum = await promisedSum;
+          const { data: service } = await supabase
+            .from('services')
+            .select('price')
+            .eq('id', serviceId)
+            .single();
+
+          return sum + (service?.price || 0);
+        }, Promise.resolve(0));
+
+        await supabase
+          .from('bookings')
+          .update({ total_amount: await totalAmount })
+          .eq('id', id);
       }
 
+      // If booking status is Scheduled and there's no job for it, auto-create one
+      if (booking.status === 'Scheduled') {
+        try {
+          const { count } = await supabase
+            .from('jobs')
+            .select('*', { count: 'exact', head: true })
+            .eq('booking_id', id);
+            
+          if (count === 0) {
+            const { jobsService } = await import('@/services/jobs');
+            await jobsService.createFromBooking(id);
+          }
+        } catch (jobError) {
+          console.error('Error checking/creating job for booking:', jobError);
+          // We don't want to fail the booking update if job creation fails
+        }
+      }
+      
       return data;
     } catch (error) {
       console.error('Error in bookingsService.update:', error);
@@ -321,6 +387,23 @@ export const bookingsService = {
       if (error) throw error;
       if (!data) throw new Error("Failed to update booking status");
       
+      // If status is changed to Scheduled, make sure there's a job
+      if (status === 'Scheduled') {
+        try {
+          const { count } = await supabase
+            .from('jobs')
+            .select('*', { count: 'exact', head: true })
+            .eq('booking_id', id);
+            
+          if (count === 0) {
+            const { jobsService } = await import('@/services/jobs');
+            await jobsService.createFromBooking(id);
+          }
+        } catch (jobError) {
+          console.error('Error checking/creating job after status change:', jobError);
+        }
+      }
+      
       return data;
     } catch (error) {
       console.error('Error in bookingsService.updateStatus:', error);
@@ -330,6 +413,29 @@ export const bookingsService = {
 
   async delete(id: string): Promise<void> {
     try {
+      // Check if there are related jobs
+      const { data: jobs } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('booking_id', id);
+        
+      // Delete any related jobs first
+      if (jobs && jobs.length > 0) {
+        for (const job of jobs) {
+          // Delete related job services
+          await supabase
+            .from('job_services')
+            .delete()
+            .eq('job_id', job.id);
+            
+          // Delete the job
+          await supabase
+            .from('jobs')
+            .delete()
+            .eq('id', job.id);
+        }
+      }
+    
       // Delete booking_services first (due to foreign key constraints)
       const { error: bookingServicesError } = await supabase
         .from('booking_services')
@@ -360,10 +466,11 @@ export const bookingsService = {
           *,
           customers (
             name,
-            phone
+            phone,
+            email
           )
         `)
-        .or(`booking_reference.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
+        .or(`booking_reference.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%,customers.phone.ilike.%${searchTerm}%`);
 
       if (error) throw error;
 
@@ -374,8 +481,8 @@ export const bookingsService = {
       // Process bookings the same way as in getAll
       const bookingsWithServices = await Promise.all(
         bookings.map(async (booking) => {
-          const services = await fetchBookingServices(booking.id);
-          return formatBookingData(booking, services);
+          const { names, ids } = await fetchBookingServices(booking.id);
+          return formatBookingData(booking, names, ids);
         })
       );
 
@@ -394,7 +501,8 @@ export const bookingsService = {
           *,
           customers (
             name,
-            phone
+            phone,
+            email
           )
         `)
         .eq('date', date);
@@ -404,8 +512,8 @@ export const bookingsService = {
       // Process bookings the same way as in getAll
       const bookingsWithServices = await Promise.all(
         bookings.map(async (booking) => {
-          const services = await fetchBookingServices(booking.id);
-          return formatBookingData(booking, services);
+          const { names, ids } = await fetchBookingServices(booking.id);
+          return formatBookingData(booking, names, ids);
         })
       );
 
