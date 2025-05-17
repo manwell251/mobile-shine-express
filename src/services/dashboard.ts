@@ -100,8 +100,11 @@ export const dashboardService = {
       let totalRevenue = 0;
       if (monthlyRevenueData && monthlyRevenueData.length > 0) {
         totalRevenue = monthlyRevenueData.reduce((sum, job) => {
-          const amount = job.bookings?.total_amount || 0;
-          return sum + Number(amount);
+          // Fixed TypeScript error by checking if bookings exists first
+          if (job.bookings && typeof job.bookings.total_amount === 'number') {
+            return sum + Number(job.bookings.total_amount);
+          }
+          return sum;
         }, 0);
       }
 
@@ -161,6 +164,9 @@ export const dashboardService = {
       // Map bookings to the desired format
       const upcomingBookings = [];
       for (const booking of bookings) {
+        // Fixed TypeScript error by checking if customers exists first
+        const customerName = booking.customers ? booking.customers.name : 'Unknown';
+
         // Get services for this booking
         const { data: serviceData } = await supabase
           .from('booking_services')
@@ -168,12 +174,12 @@ export const dashboardService = {
           .eq('booking_id', booking.id)
           .limit(1);
           
-        const service = serviceData && serviceData.length > 0 ? 
-          serviceData[0].services?.name || 'No service' : 'No service';
+        const service = serviceData && serviceData.length > 0 && serviceData[0].services ? 
+          serviceData[0].services.name || 'No service' : 'No service';
         
         upcomingBookings.push({
           id: booking.id,
-          customerName: booking.customers?.name || 'Unknown',
+          customerName,
           service,
           time: booking.time,
           status: booking.status,

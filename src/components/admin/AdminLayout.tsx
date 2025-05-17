@@ -1,15 +1,37 @@
 
 import React from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, Settings, Calendar, Clipboard, BarChart3, Users, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 const AdminLayout = () => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const isActivePath = (path: string) => {
     return currentPath.includes(path) ? 'bg-brand-blue/10 text-brand-blue' : 'text-gray-600 hover:bg-gray-100';
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out."
+      });
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const menuItems = [
@@ -29,7 +51,7 @@ const AdminLayout = () => {
           <Link to="/admin/dashboard" className="font-bold text-xl text-brand-blue">
             Klin Ride Admin
           </Link>
-          <Button variant="ghost" className="text-gray-600">
+          <Button variant="ghost" onClick={handleLogout} className="text-gray-600">
             <LogOut size={18} className="mr-2" /> Logout
           </Button>
         </div>

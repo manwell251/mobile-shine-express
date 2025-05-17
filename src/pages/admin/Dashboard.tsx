@@ -1,12 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, Clock, DollarSign, Users, LogOut } from 'lucide-react';
+import { Calendar, Clock, DollarSign, Users } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { dashboardService } from '@/services/dashboard';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
@@ -39,6 +38,11 @@ const Dashboard = () => {
         setUpcomingBookings(bookings);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
@@ -46,24 +50,6 @@ const Dashboard = () => {
 
     fetchDashboardData();
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out."
-      });
-      navigate('/admin/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const statsItems = [
     { title: 'Bookings Today', value: stats.bookingsToday.toString(), icon: <Calendar className="text-brand-blue" size={24} /> },
@@ -76,9 +62,6 @@ const Dashboard = () => {
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
-        <Button variant="outline" onClick={handleLogout}>
-          <LogOut size={16} className="mr-2" /> Logout
-        </Button>
       </div>
       
       {/* Stats Overview */}
@@ -137,7 +120,8 @@ const Dashboard = () => {
                 ))
               ) : upcomingBookings.length > 0 ? (
                 upcomingBookings.map((booking) => (
-                  <TableRow key={booking.id}>
+                  <TableRow key={booking.id} className="cursor-pointer hover:bg-gray-50" 
+                    onClick={() => navigate(`/admin/bookings?edit=${booking.id}`)}>
                     <TableCell className="font-medium">{booking.id.substring(0, 8)}</TableCell>
                     <TableCell>{booking.customerName}</TableCell>
                     <TableCell>{booking.service}</TableCell>
