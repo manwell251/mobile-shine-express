@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,9 +17,12 @@ const Login = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  console.log('Login page rendered, auth state:', { isAuthenticated, isLoading });
+
   // Redirect if already authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
+      console.log('Already authenticated, redirecting from login page');
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin/dashboard';
       navigate(from, { replace: true });
     }
@@ -40,14 +43,17 @@ const Login = () => {
     }
 
     try {
+      console.log('Attempting to log in with email:', email);
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.error('Login error:', error);
         toast({
           title: "Login Failed",
           description: error.message || "Invalid email or password. Please try again.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
       

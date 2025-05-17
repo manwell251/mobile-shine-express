@@ -14,13 +14,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { BookingWithDetails, BookingStatus } from '@/services/bookings';
+import { BookingWithDetails } from '@/services/bookings';
 import { servicesService } from '@/services/services';
 import { useToast } from '@/hooks/use-toast';
 import { bookingsService } from '@/services/bookings';
 import { CommandInput, CommandList, CommandItem, CommandGroup, Command } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/lib/supabase';
+import { BookingStatus } from '@/types/booking';
 
 interface BookingFormProps {
   onCancel: () => void;
@@ -59,8 +60,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, on
   const fetchServices = async () => {
     try {
       const result = await servicesService.getActive();
-      if (result?.data) {
-        setServices(result.data.map(service => ({
+      if (result) {
+        setServices(result.map(service => ({
           id: service.id,
           name: service.name,
           price: service.price

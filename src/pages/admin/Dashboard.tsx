@@ -12,12 +12,14 @@ import { jobsService } from '@/services/jobs';
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
-    bookingsToday: 0,
-    pendingJobs: 0,
-    revenueMonth: 'UGX 0',
-    totalCustomers: 0
+    totalBookings: 0,
+    completedBookings: 0,
+    cancelledBookings: 0,
+    totalCustomers: 0,
+    activeCustomers: 0,
+    monthlyRevenue: 'UGX 0'
   });
-  const [upcomingBookings, setUpcomingBookings] = useState([]);
+  const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,15 +44,16 @@ const Dashboard = () => {
         // Fetch stats
         const dashboardStats = await dashboardService.getStats();
         setStats({
-          bookingsToday: dashboardStats.bookingsToday,
-          pendingJobs: dashboardStats.pendingJobs,
-          revenueMonth: dashboardStats.revenueMonth,
-          totalCustomers: dashboardStats.totalCustomers
+          totalBookings: dashboardStats.totalBookings,
+          completedBookings: dashboardStats.completedBookings,
+          cancelledBookings: dashboardStats.cancelledBookings,
+          totalCustomers: dashboardStats.totalCustomers,
+          activeCustomers: dashboardStats.activeCustomers,
+          monthlyRevenue: dashboardStats.monthlyRevenue
         });
 
         // Fetch upcoming bookings
-        const bookings = await dashboardService.getUpcomingBookings();
-        setUpcomingBookings(bookings);
+        setUpcomingBookings(dashboardStats.upcomingBookings || []);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         toast({
@@ -67,9 +70,9 @@ const Dashboard = () => {
   }, []);
 
   const statsItems = [
-    { title: 'Bookings Today', value: stats.bookingsToday.toString(), icon: <Calendar className="text-brand-blue" size={24} /> },
-    { title: 'Pending Jobs', value: stats.pendingJobs.toString(), icon: <Clock className="text-amber-500" size={24} /> },
-    { title: 'Revenue (Month)', value: stats.revenueMonth, icon: <DollarSign className="text-green-500" size={24} /> },
+    { title: 'Total Bookings', value: stats.totalBookings.toString(), icon: <Calendar className="text-brand-blue" size={24} /> },
+    { title: 'Completed Jobs', value: stats.completedBookings.toString(), icon: <Clock className="text-amber-500" size={24} /> },
+    { title: 'Monthly Revenue', value: stats.monthlyRevenue, icon: <DollarSign className="text-green-500" size={24} /> },
     { title: 'Total Customers', value: stats.totalCustomers.toString(), icon: <Users className="text-purple-500" size={24} /> }
   ];
 

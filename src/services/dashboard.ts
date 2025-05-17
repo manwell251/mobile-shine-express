@@ -1,6 +1,6 @@
 
 import { supabase } from '@/lib/supabase';
-import { format, parse, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, parse, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface DashboardStats {
   totalBookings: number;
@@ -21,6 +21,7 @@ export interface DashboardStats {
     service: string;
     date: string;
     time: string;
+    status: string;
   }[];
 }
 
@@ -143,6 +144,7 @@ export const dashboardService = {
           id,
           date,
           time,
+          status,
           customers (name),
           booking_services (
             services (name)
@@ -158,7 +160,8 @@ export const dashboardService = {
         customer: booking.customers?.name || 'Unknown',
         service: booking.booking_services?.[0]?.services?.name || 'Unknown',
         date: booking.date,
-        time: booking.time
+        time: booking.time,
+        status: booking.status
       })) || [];
 
       // Format weekly days

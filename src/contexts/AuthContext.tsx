@@ -29,26 +29,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
     const initializeAuth = async () => {
       try {
         setLoading(true);
         
         // Check for existing session
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
+        const { data } = await supabase.auth.getSession();
+        setSession(data?.session || null);
+        setUser(data?.session?.user || null);
         
         // Set up auth listener
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+          console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
           setSession(session);
-          setUser(session?.user ?? null);
-          
-          // Handle sign out or token expiry
-          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
-            setUser(null);
-            setSession(null);
-          }
+          setUser(session?.user || null);
         });
         
         return () => {
@@ -66,14 +60,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting to sign in with:', email);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
       if (error) {
+        console.error('Sign in error:', error);
         return { error };
       }
+      
+      console.log('Sign in successful:', data);
       return { error: null };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing in:', error);
-      return { error: error as Error };
+      return { error };
     }
   };
 
@@ -85,16 +84,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const authValues = {
+    user,
+    session,
+    loading,
+    signIn,
+    signOut,
+    isAuthenticated: !!user,
+    isLoading: loading
+  };
+
+  console.log('Auth context current state:', { 
+    isAuthenticated: !!user, 
+    hasUser: !!user,
+    hasSession: !!session,
+    isLoading: loading 
+  });
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      loading, 
-      signIn, 
-      signOut, 
-      isAuthenticated: !!user,
-      isLoading: loading 
-    }}>
+    <AuthContext.Provider value={authValues}>
       {children}
     </AuthContext.Provider>
   );
