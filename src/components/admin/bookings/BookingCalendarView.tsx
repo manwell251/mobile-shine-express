@@ -1,102 +1,136 @@
 
-import React from 'react';
-import { Calendar, momentLocalizer } from 'react-big-calendar';
-import moment from 'moment';
-import { BookingWithDetails } from '@/services/bookings';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-
-// Set up the localizer
-const localizer = momentLocalizer(moment);
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, getDay, isToday } from 'date-fns';
+import { BookingWithDetails } from '@/services/bookings';
+import { cn } from '@/lib/utils';
 
 interface BookingCalendarViewProps {
   bookings: BookingWithDetails[];
-  onBookingClick?: (bookingId: string) => void;
+  onBookingClick: (bookingId: string) => void;
 }
 
 const BookingCalendarView: React.FC<BookingCalendarViewProps> = ({ bookings, onBookingClick }) => {
-  // Transform bookings into events for the calendar
-  const events = bookings.map(booking => {
-    // Parse date and time from booking
-    const [year, month, day] = booking.date.split('-').map(Number);
-    const [hours, minutes] = booking.time.split(':').map(Number);
-    
-    // Create start date
-    const start = new Date(year, month - 1, day, hours, minutes);
-    
-    // Assume services take 1 hour unless duration is provided
-    const end = new Date(start);
-    end.setHours(start.getHours() + 1);
-
-    // Colors based on status
-    let backgroundColor;
-    switch (booking.status) {
-      case 'Draft':
-        backgroundColor = '#f3f4f6'; // gray-100
-        break;
-      case 'Scheduled':
-        backgroundColor = '#dbeafe'; // blue-100
-        break;
-      case 'InProgress':
-        backgroundColor = '#fef3c7'; // amber-100
-        break;
-      case 'Completed':
-        backgroundColor = '#d1fae5'; // green-100
-        break;
-      case 'Cancelled':
-        backgroundColor = '#fee2e2'; // red-100
-        break;
-      default:
-        backgroundColor = '#f3f4f6'; // gray-100
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  const firstDayOfMonth = startOfMonth(currentMonth);
+  const lastDayOfMonth = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
+  
+  const startingDayOfWeek = getDay(firstDayOfMonth); // 0 = Sunday, 1 = Monday, etc.
+  
+  const previousMonth = () => {
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+  
+  const nextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
+  
+  // Group bookings by date
+  const bookingsByDate: Record<string, BookingWithDetails[]> = {};
+  
+  bookings.forEach(booking => {
+    const dateKey = booking.date;
+    if (!bookingsByDate[dateKey]) {
+      bookingsByDate[dateKey] = [];
     }
-    
-    return {
-      id: booking.id,
-      title: `${booking.customerName} - ${booking.services.join(', ')}`,
-      start,
-      end,
-      allDay: false,
-      resource: booking,
-      backgroundColor
-    };
+    bookingsByDate[dateKey].push(booking);
   });
-
-  // Customize how events are rendered
-  const eventStyleGetter = (event: any) => {
-    return {
-      style: {
-        backgroundColor: event.backgroundColor,
-        borderRadius: '4px',
-        opacity: 0.9,
-        color: '#000',
-        border: '1px solid #ccc',
-        padding: '2px 5px',
-        fontSize: '0.85em',
-      }
-    };
-  };
-
-  // Handle clicking on an event
-  const handleEventClick = (event: any) => {
-    if (onBookingClick && event.id) {
-      onBookingClick(event.id);
+  
+  // Days of the week header
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  const getStatusClass = (status: string) => {
+    switch(status) {
+      case 'Draft': return 'bg-gray-100 text-gray-700';
+      case 'Scheduled': return 'bg-blue-100 text-blue-700';
+      case 'InProgress': return 'bg-amber-100 text-amber-700';
+      case 'Completed': return 'bg-green-100 text-green-700';
+      case 'Cancelled': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
-
+  
   return (
-    <Card className="p-4 h-[700px]">
-      <Calendar
-        localizer={localizer}
-        events={events}
-        startAccessor="start"
-        endAccessor="end"
-        style={{ height: "100%" }}
-        eventPropGetter={eventStyleGetter}
-        onSelectEvent={handleEventClick}
-        views={['month', 'week', 'day', 'agenda']}
-        defaultView="month"
-        tooltipAccessor={(event: any) => `${event.title} (${event.resource.status})`}
-      />
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-medium">{format(currentMonth, 'MMMM yyyy')}</h3>
+        <div className="flex space-x-2">
+          <button 
+            onClick={previousMonth}
+            className="p-1 rounded hover:bg-gray-100"
+            aria-label="Previous month"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            onClick={nextMonth}
+            className="p-1 rounded hover:bg-gray-100"
+            aria-label="Next month"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
+      
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {/* Weekday headers */}
+        {weekdays.map(day => (
+          <div key={day} className="text-center font-medium text-sm py-1">
+            {day}
+          </div>
+        ))}
+        
+        {/* Empty cells for days before the first day of month */}
+        {Array.from({ length: startingDayOfWeek }).map((_, index) => (
+          <div key={`empty-${index}`} className="h-24 p-1 border rounded bg-gray-50"></div>
+        ))}
+        
+        {/* Days of the month */}
+        {daysInMonth.map(day => {
+          const dateKey = format(day, 'yyyy-MM-dd');
+          const dayBookings = bookingsByDate[dateKey] || [];
+          
+          return (
+            <div 
+              key={dateKey} 
+              className={cn(
+                "h-24 p-1 border rounded overflow-y-auto",
+                isToday(day) ? "border-blue-400 bg-blue-50" : "bg-white"
+              )}
+            >
+              <div className="text-right mb-1">
+                <span className={cn(
+                  "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs",
+                  isToday(day) ? "bg-blue-500 text-white" : "text-gray-700"
+                )}>
+                  {format(day, 'd')}
+                </span>
+              </div>
+              
+              {/* Bookings for this day */}
+              <div className="space-y-1">
+                {dayBookings.map(booking => (
+                  <div 
+                    key={booking.id} 
+                    className={cn(
+                      "text-xs p-1 rounded cursor-pointer hover:opacity-80",
+                      getStatusClass(booking.status)
+                    )}
+                    onClick={() => onBookingClick(booking.id)}
+                  >
+                    <div className="font-medium truncate">{format(parseISO(`${booking.date}T${booking.time}`), 'h:mm a')}</div>
+                    <div className="truncate">{booking.customerName}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 };

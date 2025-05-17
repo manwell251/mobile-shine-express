@@ -1,91 +1,121 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { EyeIcon, EyeOffIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
-const AdminLogin = () => {
+const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
   const { signIn, isLoading, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect if already authenticated
-  useEffect(() => {
+  React.useEffect(() => {
     if (isAuthenticated) {
-      navigate('/admin/dashboard');
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin/dashboard';
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    signIn(email, password);
+    setIsSubmitting(true);
+
+    if (!email || !password) {
+      toast({
+        title: "Error",
+        description: "Please enter both email and password.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message || "Invalid email or password. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Authentication successful, redirection is handled by the useEffect
+      toast({
+        title: "Login Successful",
+        description: "You've been logged in successfully.",
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-brand-blue">Klin Ride Admin</h1>
-          <p className="text-gray-600 mt-2">Sign in to your admin account</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <Card className="w-full max-w-md p-6 bg-white shadow-lg rounded-lg">
+        <div className="flex flex-col items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Login</h1>
+          <p className="text-gray-600">Enter your credentials to access the admin dashboard</p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+        
+        <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input 
+            <Input
               id="email"
               type="email"
-              required
+              placeholder="admin@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@klinride.com"
+              required
             />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input 
-                id="password"
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-              <button 
-                type="button"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
-              </button>
-            </div>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </div>
-
           <Button 
             type="submit" 
-            className="w-full" 
-            disabled={isLoading}
+            className="w-full"
+            disabled={isSubmitting || isLoading}
           >
-            {isLoading ? 'Signing in...' : 'Sign in'}
+            {isSubmitting ? "Logging in..." : "Login"}
           </Button>
         </form>
         
-        <div className="mt-6 text-center text-sm">
-          <p className="text-gray-500">
-            For testing, create a user in the Supabase authentication dashboard
-          </p>
+        <div className="mt-4 text-sm text-center text-gray-600">
+          <a href="/" className="text-primary hover:underline">
+            Return to Website
+          </a>
         </div>
       </Card>
     </div>
   );
 };
 
-export default AdminLogin;
+export default Login;

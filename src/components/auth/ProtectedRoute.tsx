@@ -1,6 +1,6 @@
 
 import { ReactNode, useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
@@ -9,8 +9,9 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [sessionChecked, setSessionChecked] = useState(false);
   const [hasValidSession, setHasValidSession] = useState(false);
 
@@ -19,10 +20,21 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       const { data: { session } } = await supabase.auth.getSession();
       setHasValidSession(!!session);
       setSessionChecked(true);
+      
+      // Listen for auth state changes
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          navigate('/admin/login', { replace: true });
+        }
+      });
+      
+      return () => {
+        authListener.subscription.unsubscribe();
+      };
     };
     
     checkSession();
-  }, []);
+  }, [navigate]);
 
   // Show nothing while we check authentication
   if (loading || !sessionChecked) {
@@ -34,7 +46,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   // If not authenticated, redirect to login
-  if (!user && !hasValidSession) {
+  if (!isAuthenticated && !hasValidSession) {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 

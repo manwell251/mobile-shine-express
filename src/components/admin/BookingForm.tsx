@@ -14,12 +14,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { BookingWithDetails } from '@/services/bookings';
+import { BookingWithDetails, BookingStatus } from '@/services/bookings';
 import { servicesService } from '@/services/services';
 import { useToast } from '@/hooks/use-toast';
 import { bookingsService } from '@/services/bookings';
 import { CommandInput, CommandList, CommandItem, CommandGroup, Command } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { supabase } from '@/lib/supabase';
 
 interface BookingFormProps {
   onCancel: () => void;
@@ -41,7 +42,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, on
     vehicleYear: existingBooking?.vehicle?.year || new Date().getFullYear().toString(),
     date: existingBooking?.date || new Date().toISOString().slice(0, 10),
     time: existingBooking?.time || '',
-    status: existingBooking?.status || 'Draft',
+    status: existingBooking?.status || 'Draft' as BookingStatus,
     location: existingBooking?.location || '',
     notes: existingBooking?.notes || '',
     customerId: existingBooking?.customer_id || null,
@@ -57,12 +58,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, on
 
   const fetchServices = async () => {
     try {
-      const { data } = await servicesService.getActive();
-      setServices(data.map(service => ({
-        id: service.id,
-        name: service.name,
-        price: service.price
-      })));
+      const result = await servicesService.getActive();
+      if (result?.data) {
+        setServices(result.data.map(service => ({
+          id: service.id,
+          name: service.name,
+          price: service.price
+        })));
+      }
     } catch (error) {
       console.error('Error fetching services:', error);
       toast({
@@ -75,7 +78,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, on
 
   const fetchCustomers = async () => {
     try {
-      const { data } = await supabase.from('customers').select('*');
+      const { data, error } = await supabase.from('customers').select('*');
+      if (error) throw error;
       if (data) {
         setCustomers(data);
       }
@@ -98,7 +102,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, on
   };
 
   const handleStatusChange = (status: string) => {
-    setFormData(prev => ({ ...prev, status }));
+    setFormData(prev => ({ ...prev, status: status as BookingStatus }));
   };
 
   // Filter customers based on search query
@@ -167,17 +171,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ onCancel, existingBooking, on
         customerId = newCustomer.id;
       }
       
+      // Calculate total amount
+      const totalAmount = services
+        .filter(service => selectedServices.includes(service.id))
+        .reduce((total, service) => total + (service.price || 0), 0);
+      
       // Prepare booking data
       const bookingData = {
+        booking_reference: existingBooking?.booking_reference || `BK${new Date().getTime().toString().slice(-6)}`,
         customer_id: customerId,
         date: formData.date,
         time: formData.time,
         status: formData.status,
         location: formData.location,
         notes: formData.notes || null,
-        total_amount: services
-          .filter(service => selectedServices.includes(service.id))
-          .reduce((total, service) => total + (service.price || 0), 0)
+        total_amount: totalAmount
       };
       
       let bookingResult;

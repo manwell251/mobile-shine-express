@@ -1,192 +1,103 @@
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Session, User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useToast } from '@/hooks/use-toast';
+import { Session, User } from '@supabase/supabase-js';
 
 interface AuthContextProps {
   user: User | null;
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
-export const AuthContext = createContext<AuthContextProps>({
+const AuthContext = createContext<AuthContextProps>({
   user: null,
   session: null,
   loading: true,
   signIn: async () => ({ error: null }),
-  signUp: async () => ({ error: null }),
   signOut: async () => {},
+  isAuthenticated: false,
+  isLoading: true,
 });
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        // Handle session expired/deleted
-        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-          setUser(null);
-          setSession(null);
-          
-          // If not on login page or public page, redirect
-          const publicPaths = ['/admin/login', '/', '/about', '/services', '/pricing', '/contact', '/booking'];
-          if (!publicPaths.includes(location.pathname) && location.pathname.includes('/admin')) {
-            navigate('/admin/login');
-          }
-        }
-      }
-    );
-
-    // Then check for existing session
+    // Get initial session
     const initializeAuth = async () => {
       try {
         setLoading(true);
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
         
-        if (currentSession) {
-          setSession(currentSession);
-          setUser(currentSession.user);
-        }
+        // Check for existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Set up auth listener
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // Handle sign out or token expiry
+          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+            setUser(null);
+            setSession(null);
+          }
+        });
+        
+        return () => {
+          authListener.subscription.unsubscribe();
+        };
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
         setLoading(false);
       }
     };
-
+    
     initializeAuth();
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
-  // Sign in with email and password
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
         return { error };
       }
-
-      // Successfully signed in
-      setUser(data.user);
-      setSession(data.session);
-      navigate('/admin/dashboard');
       return { error: null };
     } catch (error) {
-      console.error('Error during sign in:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred during sign in.",
-        variant: "destructive",
-      });
+      console.error('Error signing in:', error);
       return { error: error as Error };
     }
   };
 
-  // Sign up with email and password
-  const signUp = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error };
-      }
-
-      toast({
-        title: "Success",
-        description: "Account created! Please check your email for verification.",
-      });
-      
-      // If auto-confirmed (development mode often has this)
-      if (data.session) {
-        setUser(data.user);
-        setSession(data.session);
-        navigate('/admin/dashboard');
-      }
-      
-      return { error: null };
-    } catch (error) {
-      console.error('Error during sign up:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred during sign up.",
-        variant: "destructive",
-      });
-      return { error: error as Error };
-    }
-  };
-
-  // Sign out
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-      navigate('/admin/login');
     } catch (error) {
-      console.error('Error during sign out:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred during sign out.",
-        variant: "destructive",
-      });
+      console.error('Error signing out:', error);
     }
   };
 
-  const value = {
-    user,
-    session,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      loading, 
+      signIn, 
+      signOut, 
+      isAuthenticated: !!user,
+      isLoading: loading 
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
