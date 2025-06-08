@@ -60,11 +60,19 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
   const confirmDelete = async () => {
     if (jobToDelete) {
       try {
-        await jobsService.delete(jobToDelete);
-        toast({
-          title: "Success",
-          description: "Job deleted successfully"
-        });
+        // Only delete actual jobs, not bookings shown as jobs
+        if (!jobToDelete.startsWith('booking-')) {
+          await jobsService.delete(jobToDelete);
+          toast({
+            title: "Success",
+            description: "Job deleted successfully"
+          });
+        } else {
+          toast({
+            title: "Info",
+            description: "Cannot delete booking-based jobs. Change booking status instead."
+          });
+        }
         setDeleteDialogOpen(false);
         if (onRefresh) onRefresh();
       } catch (error) {
@@ -83,7 +91,20 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
   const handleUpdateStatus = async (jobId: string, status: string) => {
     setStatusUpdateLoading(jobId);
     try {
-      await jobsService.updateStatus(jobId, status);
+      if (jobId.startsWith('booking-')) {
+        // This is a booking shown as a job - update the booking status
+        const bookingId = jobId.replace('booking-', '');
+        const { error } = await supabase
+          .from('bookings')
+          .update({ status })
+          .eq('id', bookingId);
+        
+        if (error) throw error;
+      } else {
+        // This is an actual job
+        await jobsService.updateStatus(jobId, status);
+      }
+      
       toast({
         title: "Status Updated",
         description: `Job status changed to ${status}`
@@ -102,8 +123,15 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
   };
 
   const handleViewJob = (jobId: string) => {
-    // Navigate to job details page
-    navigate(`/admin/jobs/${jobId}`);
+    // Navigate to job details page only for actual jobs
+    if (!jobId.startsWith('booking-')) {
+      navigate(`/admin/jobs/${jobId}`);
+    } else {
+      toast({
+        title: "Info",
+        description: "This is a booking shown as a job. View details in Bookings section."
+      });
+    }
   };
 
   return (
@@ -149,7 +177,10 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
               ) : (
                 jobs.map((job) => (
                   <TableRow key={job.id}>
-                    <TableCell className="font-medium">{job.job_reference}</TableCell>
+                    <TableCell className="font-medium">
+                      {job.job_reference}
+                      {job.isFromBooking && <span className="text-xs text-blue-500 ml-1">(Booking)</span>}
+                    </TableCell>
                     <TableCell>{job.bookingId}</TableCell>
                     <TableCell>{job.customerName}</TableCell>
                     <TableCell>
@@ -161,8 +192,9 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
                     <TableCell>
                       <TechnicianAssignment 
                         jobId={job.id}
-                        currentTechnicianId={job.technician === 'Unassigned' ? undefined : job.technician}
+                        currentTechnicianId={job.technician_id}
                         onAssignmentUpdate={onRefresh}
+                        isFromBooking={job.isFromBooking}
                       />
                     </TableCell>
                     <TableCell>
@@ -189,6 +221,7 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
                           variant="ghost" 
                           size="sm" 
                           onClick={() => handleViewJob(job.id)}
+                          disabled={job.isFromBooking}
                         >
                           <Edit size={16} className="mr-1" />
                           View
@@ -197,6 +230,7 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
                           variant="outline" 
                           size="sm"
                           onClick={() => handleDelete(job.id)}
+                          disabled={job.isFromBooking}
                         >
                           <Trash2 size={16} className="mr-1" />
                           Delete

@@ -12,17 +12,20 @@ import { techniciansService, Technician } from '@/services/technicians';
 import { jobsService } from '@/services/jobs';
 import { useToast } from '@/hooks/use-toast';
 import { UserCheck } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface TechnicianAssignmentProps {
   jobId: string;
   currentTechnicianId?: string;
   onAssignmentUpdate?: () => void;
+  isFromBooking?: boolean;
 }
 
 const TechnicianAssignment: React.FC<TechnicianAssignmentProps> = ({
   jobId,
   currentTechnicianId,
-  onAssignmentUpdate
+  onAssignmentUpdate,
+  isFromBooking = false
 }) => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>(currentTechnicianId || '');
@@ -51,9 +54,20 @@ const TechnicianAssignment: React.FC<TechnicianAssignmentProps> = ({
 
     try {
       setIsUpdating(true);
-      await jobsService.update(jobId, { 
-        technician_id: selectedTechnicianId === 'unassigned' ? null : selectedTechnicianId 
-      });
+
+      if (isFromBooking) {
+        // This is a booking shown as a job, extract booking ID
+        const bookingId = jobId.replace('booking-', '');
+        await jobsService.updateBookingTechnician(
+          bookingId, 
+          selectedTechnicianId === 'unassigned' ? null : selectedTechnicianId
+        );
+      } else {
+        // This is an actual job
+        await jobsService.update(jobId, { 
+          technician_id: selectedTechnicianId === 'unassigned' ? null : selectedTechnicianId 
+        });
+      }
       
       toast({
         title: "Success",

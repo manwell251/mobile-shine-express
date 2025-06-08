@@ -16,14 +16,16 @@ export interface JobWithDetails {
   status: 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled';
   amount: string;
   technician: string;
+  technician_id?: string;
   location: string;
   notes?: string;
+  isFromBooking?: boolean;
 }
 
 export const jobsService = {
   async getAll(): Promise<JobWithDetails[]> {
-    // Fetch jobs with related booking, technician, and customer info
-    const { data: jobs, error } = await supabase
+    // First get actual jobs
+    const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select(`
         *,
@@ -41,11 +43,24 @@ export const jobsService = {
         )
       `);
 
-    if (error) throw error;
+    if (jobsError) throw jobsError;
 
-    // For each job, fetch the associated services through booking_services
-    const jobsWithDetails = await Promise.all(
-      jobs.map(async (job) => {
+    // Get InProgress and Completed bookings that don't have jobs yet
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        customers (
+          name
+        )
+      `)
+      .in('status', ['InProgress', 'Completed']);
+
+    if (bookingsError) throw bookingsError;
+
+    // Process actual jobs
+    const processedJobs = await Promise.all(
+      (jobs || []).map(async (job) => {
         if (!job.booking_id) {
           return {
             id: job.id,
@@ -57,8 +72,10 @@ export const jobsService = {
             status: job.status as any,
             amount: 'UGX 0',
             technician: job.technicians?.name || 'Unassigned',
+            technician_id: job.technician_id,
             location: 'Unknown',
-            notes: job.notes || undefined
+            notes: job.notes || undefined,
+            isFromBooking: false
           };
         }
 
@@ -87,23 +104,63 @@ export const jobsService = {
           status: job.status as any,
           amount: formattedAmount,
           technician: job.technicians?.name || 'Unassigned',
+          technician_id: job.technician_id,
           location: job.bookings?.location || 'Unknown',
-          notes: job.notes || undefined
+          notes: job.notes || undefined,
+          isFromBooking: false
         };
       })
     );
 
-    return jobsWithDetails;
+    // Process bookings as jobs (for InProgress and Completed bookings without actual jobs)
+    const existingJobBookingIds = new Set((jobs || []).map(job => job.booking_id).filter(Boolean));
+    const bookingsAsJobs = await Promise.all(
+      (bookings || [])
+        .filter(booking => !existingJobBookingIds.has(booking.id))
+        .map(async (booking) => {
+          // Get services for this booking
+          const { data: serviceData } = await supabase
+            .from('booking_services')
+            .select('*, services(name)')
+            .eq('booking_id', booking.id);
+
+          const services = serviceData?.map(item => item.services?.name || '') || [];
+
+          const formattedAmount = new Intl.NumberFormat('en-UG', {
+            style: 'currency',
+            currency: 'UGX',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(booking.total_amount || 0);
+
+          return {
+            id: `booking-${booking.id}`,
+            job_reference: booking.booking_reference,
+            bookingId: booking.booking_reference,
+            customerName: booking.customers?.name || 'Unknown',
+            services: services,
+            date: booking.date ? format(new Date(booking.date), 'yyyy-MM-dd') : 'No Date',
+            status: booking.status as any,
+            amount: formattedAmount,
+            technician: 'Unassigned',
+            technician_id: undefined,
+            location: booking.location || 'Unknown',
+            notes: booking.notes || undefined,
+            isFromBooking: true
+          };
+        })
+    );
+
+    return [...processedJobs, ...bookingsAsJobs];
   },
 
   async getByStatus(status: string): Promise<JobWithDetails[]> {
-    // If status is 'all', fetch all jobs
     if (status === 'all') {
       return this.getAll();
     }
 
-    // Otherwise, filter by status
-    const { data: jobs, error } = await supabase
+    // Get actual jobs with the status
+    const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select(`
         *,
@@ -122,11 +179,28 @@ export const jobsService = {
       `)
       .eq('status', status);
 
-    if (error) throw error;
+    if (jobsError) throw jobsError;
 
-    // Process each job the same way as in getAll
-    const jobsWithDetails = await Promise.all(
-      jobs.map(async (job) => {
+    // Get bookings with the status if it's InProgress or Completed
+    let bookings: any[] = [];
+    if (status === 'InProgress' || status === 'Completed') {
+      const { data: bookingData, error: bookingsError } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          customers (
+            name
+          )
+        `)
+        .eq('status', status);
+
+      if (bookingsError) throw bookingsError;
+      bookings = bookingData || [];
+    }
+
+    // Process actual jobs
+    const processedJobs = await Promise.all(
+      (jobs || []).map(async (job) => {
         if (!job.booking_id) {
           return {
             id: job.id,
@@ -138,12 +212,13 @@ export const jobsService = {
             status: job.status as any,
             amount: 'UGX 0',
             technician: job.technicians?.name || 'Unassigned',
+            technician_id: job.technician_id,
             location: 'Unknown',
-            notes: job.notes || undefined
+            notes: job.notes || undefined,
+            isFromBooking: false
           };
         }
 
-        // Get services for this booking
         const { data: serviceData } = await supabase
           .from('booking_services')
           .select('*, services(name)')
@@ -168,13 +243,53 @@ export const jobsService = {
           status: job.status as any,
           amount: formattedAmount,
           technician: job.technicians?.name || 'Unassigned',
+          technician_id: job.technician_id,
           location: job.bookings?.location || 'Unknown',
-          notes: job.notes || undefined
+          notes: job.notes || undefined,
+          isFromBooking: false
         };
       })
     );
 
-    return jobsWithDetails;
+    // Process bookings as jobs (for InProgress and Completed bookings without actual jobs)
+    const existingJobBookingIds = new Set((jobs || []).map(job => job.booking_id).filter(Boolean));
+    const bookingsAsJobs = await Promise.all(
+      bookings
+        .filter(booking => !existingJobBookingIds.has(booking.id))
+        .map(async (booking) => {
+          const { data: serviceData } = await supabase
+            .from('booking_services')
+            .select('*, services(name)')
+            .eq('booking_id', booking.id);
+
+          const services = serviceData?.map(item => item.services?.name || '') || [];
+
+          const formattedAmount = new Intl.NumberFormat('en-UG', {
+            style: 'currency',
+            currency: 'UGX',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(booking.total_amount || 0);
+
+          return {
+            id: `booking-${booking.id}`,
+            job_reference: booking.booking_reference,
+            bookingId: booking.booking_reference,
+            customerName: booking.customers?.name || 'Unknown',
+            services: services,
+            date: booking.date ? format(new Date(booking.date), 'yyyy-MM-dd') : 'No Date',
+            status: booking.status as any,
+            amount: formattedAmount,
+            technician: 'Unassigned',
+            technician_id: undefined,
+            location: booking.location || 'Unknown',
+            notes: booking.notes || undefined,
+            isFromBooking: true
+          };
+        })
+    );
+
+    return [...processedJobs, ...bookingsAsJobs];
   },
 
   async getById(id: string): Promise<JobWithDetails | null> {
@@ -229,8 +344,10 @@ export const jobsService = {
       status: job.status as any,
       amount: formattedAmount,
       technician: job.technicians?.name || 'Unassigned',
+      technician_id: job.technician_id,
       location: job.bookings?.location || 'Unknown',
-      notes: job.notes || undefined
+      notes: job.notes || undefined,
+      isFromBooking: false
     };
   },
 
@@ -265,7 +382,7 @@ export const jobsService = {
         booking_id: bookingId,
         date: format(jobDate, 'yyyy-MM-dd'),
         technician_id: technicianId || null,
-        status: 'Scheduled',
+        status: booking.status as any,
         notes: booking.notes || null,
         job_reference: `J${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}` // Temporary reference
       };
@@ -279,29 +396,6 @@ export const jobsService = {
       if (jobError) throw jobError;
       if (!newJob) throw new Error('Failed to create job');
       
-      // Add services to job_services
-      const { data: bookingServices, error: servicesError } = await supabase
-        .from('booking_services')
-        .select('service_id, price_at_booking, quantity')
-        .eq('booking_id', bookingId);
-        
-      if (servicesError) throw servicesError;
-      
-      if (bookingServices && bookingServices.length > 0) {
-        const jobServices = bookingServices.map(service => ({
-          job_id: newJob.id,
-          service_id: service.service_id,
-          price: service.price_at_booking,
-          quantity: service.quantity || 1
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('job_services')
-          .insert(jobServices);
-          
-        if (insertError) throw insertError;
-      }
-      
       return newJob;
     } catch (error) {
       console.error('Error creating job from booking:', error);
@@ -311,24 +405,21 @@ export const jobsService = {
   
   async autoCreateJobsFromScheduledBookings(): Promise<number> {
     try {
-      // Get scheduled bookings that don't have jobs
-      const { data: scheduledBookings, error: bookingsError } = await supabase
+      // Get InProgress and Completed bookings that don't have jobs
+      const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select(`
-          id,
-          date
-        `)
-        .eq('status', 'Scheduled')
+        .select('id, date')
+        .in('status', ['InProgress', 'Completed'])
         .order('date', { ascending: true });
         
       if (bookingsError) throw bookingsError;
       
-      if (!scheduledBookings || scheduledBookings.length === 0) return 0;
+      if (!bookings || bookings.length === 0) return 0;
       
       // Check which bookings don't have jobs yet
       let jobsCreated = 0;
       
-      for (const booking of scheduledBookings) {
+      for (const booking of bookings) {
         // Check if job exists for this booking
         const { count, error: countError } = await supabase
           .from('jobs')
@@ -361,6 +452,32 @@ export const jobsService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async updateBookingTechnician(bookingId: string, technicianId: string | null): Promise<void> {
+    // For bookings shown as jobs, we need to update the booking's technician assignment
+    // First check if a job exists for this booking
+    const { data: existingJob } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('booking_id', bookingId)
+      .single();
+
+    if (existingJob) {
+      // Update the existing job
+      await this.update(existingJob.id, { technician_id: technicianId });
+    } else {
+      // Create a new job for this booking with the technician assigned
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+
+      if (booking) {
+        await this.createFromBooking(bookingId, technicianId || undefined);
+      }
+    }
   },
 
   async updateStatus(id: string, status: string): Promise<JobRow> {
@@ -412,9 +529,26 @@ export const jobsService = {
 
     if (error) throw error;
 
-    // Process jobs the same way as in getAll
-    const jobsWithDetails = await Promise.all(
-      jobs.map(async (job) => {
+    // Also search in bookings
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        customers (
+          name
+        )
+      `)
+      .in('status', ['InProgress', 'Completed'])
+      .or(`
+        booking_reference.ilike.%${searchTerm}%,
+        customers.name.ilike.%${searchTerm}%
+      `);
+
+    if (bookingsError) throw bookingsError;
+
+    // Process jobs and bookings the same way as in getAll
+    const processedJobs = await Promise.all(
+      (jobs || []).map(async (job) => {
         if (!job.booking_id) {
           return {
             id: job.id,
@@ -426,8 +560,10 @@ export const jobsService = {
             status: job.status as any,
             amount: 'UGX 0',
             technician: job.technicians?.name || 'Unassigned',
+            technician_id: job.technician_id,
             location: 'Unknown',
-            notes: job.notes || undefined
+            notes: job.notes || undefined,
+            isFromBooking: false
           };
         }
 
@@ -455,13 +591,53 @@ export const jobsService = {
           status: job.status as any,
           amount: formattedAmount,
           technician: job.technicians?.name || 'Unassigned',
+          technician_id: job.technician_id,
           location: job.bookings?.location || 'Unknown',
-          notes: job.notes || undefined
+          notes: job.notes || undefined,
+          isFromBooking: false
         };
       })
     );
 
-    return jobsWithDetails;
+    // Process bookings as jobs
+    const existingJobBookingIds = new Set((jobs || []).map(job => job.booking_id).filter(Boolean));
+    const bookingsAsJobs = await Promise.all(
+      (bookings || [])
+        .filter(booking => !existingJobBookingIds.has(booking.id))
+        .map(async (booking) => {
+          const { data: serviceData } = await supabase
+            .from('booking_services')
+            .select('*, services(name)')
+            .eq('booking_id', booking.id);
+
+          const services = serviceData?.map(item => item.services?.name || '') || [];
+
+          const formattedAmount = new Intl.NumberFormat('en-UG', {
+            style: 'currency',
+            currency: 'UGX',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(booking.total_amount || 0);
+
+          return {
+            id: `booking-${booking.id}`,
+            job_reference: booking.booking_reference,
+            bookingId: booking.booking_reference,
+            customerName: booking.customers?.name || 'Unknown',
+            services: services,
+            date: booking.date ? format(new Date(booking.date), 'yyyy-MM-dd') : 'No Date',
+            status: booking.status as any,
+            amount: formattedAmount,
+            technician: 'Unassigned',
+            technician_id: undefined,
+            location: booking.location || 'Unknown',
+            notes: booking.notes || undefined,
+            isFromBooking: true
+          };
+        })
+    );
+
+    return [...processedJobs, ...bookingsAsJobs];
   },
 
   async generateInvoice(jobId: string): Promise<string> {
