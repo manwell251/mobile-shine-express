@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Edit, Trash2 } from 'lucide-react';
+import TechnicianAssignment from './TechnicianAssignment';
 
 interface JobsTableProps {
   jobs: JobWithDetails[];
@@ -157,7 +158,13 @@ const JobsTable: React.FC<JobsTableProps> = ({ jobs, isLoading = false, onRefres
                       ))}
                     </TableCell>
                     <TableCell>{job.date}</TableCell>
-                    <TableCell>{job.technician}</TableCell>
+                    <TableCell>
+                      <TechnicianAssignment 
+                        jobId={job.id}
+                        currentTechnicianId={job.technician === 'Unassigned' ? undefined : job.technician}
+                        onAssignmentUpdate={onRefresh}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Select
                         value={job.status}

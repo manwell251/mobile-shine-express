@@ -1,6 +1,5 @@
 
 import { supabase } from '@/lib/supabase';
-import { format, parse, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface DashboardStats {
   totalBookings: number;
@@ -9,182 +8,119 @@ export interface DashboardStats {
   totalCustomers: number;
   activeCustomers: number;
   monthlyRevenue: string;
-  weeklyBookings: number[];
-  weekDays: string[];
-  topServices: {
-    name: string;
-    count: number;
-  }[];
-  upcomingBookings: {
-    id: string;
-    customer: string;
-    service: string;
-    date: string;
-    time: string;
-    status: string;
-  }[];
+  confirmedRevenue: string;
+  projectedRevenue: string;
+  outstandingRevenue: string;
+  bookingsToday: number;
+  pendingJobs: number;
+  revenueMonth: string;
 }
 
-interface RevenueStats {
-  actual: string;
-  projected: string;
-  percentChange: string;
-  breakdown: {
-    labels: string[];
-    actual: number[];
-    projected: number[];
-  };
+export interface RevenueStats {
+  totalRevenue: number;
+  monthlyRevenue: number;
+  revenueByMonth: Array<{
+    month: string;
+    revenue: number;
+  }>;
 }
 
 export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
     try {
-      // Total bookings
-      const { count: totalBookings } = await supabase
+      // Get booking stats
+      const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*', { count: 'exact', head: true });
+        .select('status, total_amount, date, created_at');
 
-      // Completed bookings
-      const { count: completedBookings } = await supabase
-        .from('bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'Completed');
+      if (bookingsError) throw bookingsError;
 
-      // Cancelled bookings
-      const { count: cancelledBookings } = await supabase
-        .from('bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'Cancelled');
-
-      // Total customers
-      const { count: totalCustomers } = await supabase
+      // Get customer stats
+      const { data: customers, error: customersError } = await supabase
         .from('customers')
-        .select('*', { count: 'exact', head: true });
+        .select('id, created_at');
 
-      // Active customers (customers with at least one booking in the last 90 days)
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      
-      const { data: recentBookings } = await supabase
-        .from('bookings')
-        .select('customer_id')
-        .gte('date', format(ninetyDaysAgo, 'yyyy-MM-dd'));
-      
-      // Get unique customer IDs from recent bookings
-      const activeCustomerIds = [...new Set(recentBookings?.map(booking => booking.customer_id))];
-      const activeCustomers = activeCustomerIds.length;
+      if (customersError) throw customersError;
 
-      // Monthly revenue
-      const startOfCurrentMonth = startOfMonth(new Date());
-      const endOfCurrentMonth = endOfMonth(new Date());
-      
-      const { data: monthlyBookings } = await supabase
-        .from('bookings')
-        .select('total_amount')
-        .in('status', ['Completed', 'InProgress'])
-        .gte('date', format(startOfCurrentMonth, 'yyyy-MM-dd'))
-        .lte('date', format(endOfCurrentMonth, 'yyyy-MM-dd'));
-      
-      const monthlyRevenue = monthlyBookings && monthlyBookings.length > 0 ? 
-        monthlyBookings.reduce((sum, booking: any) => sum + (booking?.total_amount || 0), 0) : 0;
+      // Get job stats
+      const { data: jobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select('status, date');
 
-      // Weekly bookings
-      const startDate = startOfWeek(new Date(), { weekStartsOn: 0 }); // 0 is Sunday
-      const endDate = endOfWeek(new Date(), { weekStartsOn: 0 });
-      const weekDays = eachDayOfInterval({ start: startDate, end: endDate });
-      
-      const { data: weeklyBookingsData } = await supabase
-        .from('bookings')
-        .select('date, id')
-        .gte('date', format(startDate, 'yyyy-MM-dd'))
-        .lte('date', format(endDate, 'yyyy-MM-dd'));
+      if (jobsError) throw jobsError;
 
-      // Initialize array for each day of the week
-      const weeklyBookingCounts = Array(7).fill(0);
-      
-      // Count bookings for each day
-      weeklyBookingsData?.forEach((booking: any) => {
-        const bookingDate = parse(booking.date, 'yyyy-MM-dd', new Date());
-        const dayIndex = bookingDate.getDay(); // 0 for Sunday, 1 for Monday, etc.
-        weeklyBookingCounts[dayIndex]++;
-      });
+      // Get invoice stats for confirmed revenue
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('payment_status, total_amount');
 
-      // Get top services
-      const { data: serviceBookings } = await supabase
-        .from('booking_services')
-        .select(`
-          service_id,
-          services ( name )
-        `)
-        .limit(50); // Get a reasonable sample
+      if (invoicesError) throw invoicesError;
 
-      // Count occurrences of each service
-      const serviceCounts: Record<string, { name: string; count: number }> = {};
-      
-      serviceBookings?.forEach((item: any) => {
-        const serviceId = item.service_id;
-        const serviceName = item.services?.name || 'Unknown';
-        
-        if (!serviceCounts[serviceId]) {
-          serviceCounts[serviceId] = { name: serviceName, count: 0 };
-        }
-        serviceCounts[serviceId].count++;
-      });
-      
-      // Convert to array and sort
-      const topServices = Object.values(serviceCounts)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5); // Get top 5
-
-      // Get upcoming bookings
       const today = new Date();
-      const { data: upcomingBookingsData } = await supabase
-        .from('bookings')
-        .select(`
-          id,
-          date,
-          time,
-          status,
-          customers (name),
-          booking_services (
-            services (name)
-          )
-        `)
-        .gte('date', format(today, 'yyyy-MM-dd'))
-        .in('status', ['Draft', 'Scheduled'])
-        .order('date', { ascending: true })
-        .limit(5);
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const todayStr = today.toISOString().split('T')[0];
 
-      const upcomingBookings = upcomingBookingsData?.map((booking: any) => ({
-        id: booking.id,
-        customer: booking.customers?.name || 'Unknown',
-        service: booking.booking_services?.[0]?.services?.name || 'Unknown',
-        date: booking.date,
-        time: booking.time,
-        status: booking.status
-      })) || [];
+      // Calculate booking stats
+      const totalBookings = bookings?.length || 0;
+      const completedBookings = bookings?.filter(b => b.status === 'Completed').length || 0;
+      const cancelledBookings = bookings?.filter(b => b.status === 'Cancelled').length || 0;
+      const bookingsToday = bookings?.filter(b => b.date === todayStr).length || 0;
 
-      // Format weekly days
-      const formattedWeekDays = weekDays.map(day => format(day, 'EEE'));
+      // Calculate customer stats
+      const totalCustomers = customers?.length || 0;
+      const recentCustomers = customers?.filter(c => {
+        const createdDate = new Date(c.created_at);
+        const monthsAgo = new Date();
+        monthsAgo.setMonth(monthsAgo.getMonth() - 3);
+        return createdDate >= monthsAgo;
+      }).length || 0;
+
+      // Calculate job stats
+      const pendingJobs = jobs?.filter(j => j.status === 'Scheduled' || j.status === 'InProgress').length || 0;
+
+      // Calculate revenue metrics
+      const confirmedRevenue = invoices?.filter(i => i.payment_status === 'Paid')
+        .reduce((sum, i) => sum + (i.total_amount || 0), 0) || 0;
+
+      const outstandingRevenue = invoices?.filter(i => i.payment_status === 'Pending' || i.payment_status === 'Overdue')
+        .reduce((sum, i) => sum + (i.total_amount || 0), 0) || 0;
+
+      // Projected revenue from all bookings (including those without invoices yet)
+      const totalBookingRevenue = bookings?.filter(b => b.status !== 'Cancelled')
+        .reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
+
+      const projectedRevenue = totalBookingRevenue - confirmedRevenue;
+
+      // Monthly revenue (current month completed bookings)
+      const monthlyRevenue = bookings?.filter(b => {
+        const bookingDate = new Date(b.created_at);
+        return bookingDate.getMonth() === currentMonth && 
+               bookingDate.getFullYear() === currentYear &&
+               b.status === 'Completed';
+      }).reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
 
       // Format currency
-      const formattedRevenue = new Intl.NumberFormat('en-UG', {
+      const formatCurrency = (amount: number) => new Intl.NumberFormat('en-UG', {
         style: 'currency',
         currency: 'UGX',
-        minimumFractionDigits: 0
-      }).format(monthlyRevenue);
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(amount);
 
       return {
-        totalBookings: totalBookings || 0,
-        completedBookings: completedBookings || 0,
-        cancelledBookings: cancelledBookings || 0,
-        totalCustomers: totalCustomers || 0,
-        activeCustomers: activeCustomers || 0,
-        monthlyRevenue: formattedRevenue,
-        weeklyBookings: weeklyBookingCounts,
-        weekDays: formattedWeekDays,
-        topServices,
-        upcomingBookings
+        totalBookings,
+        completedBookings,
+        cancelledBookings,
+        totalCustomers,
+        activeCustomers: recentCustomers,
+        monthlyRevenue: formatCurrency(monthlyRevenue),
+        confirmedRevenue: formatCurrency(confirmedRevenue),
+        projectedRevenue: formatCurrency(projectedRevenue),
+        outstandingRevenue: formatCurrency(outstandingRevenue),
+        bookingsToday,
+        pendingJobs,
+        revenueMonth: formatCurrency(monthlyRevenue)
       };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -195,97 +131,95 @@ export const dashboardService = {
         totalCustomers: 0,
         activeCustomers: 0,
         monthlyRevenue: 'UGX 0',
-        weeklyBookings: [0, 0, 0, 0, 0, 0, 0],
-        weekDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        topServices: [],
-        upcomingBookings: []
+        confirmedRevenue: 'UGX 0',
+        projectedRevenue: 'UGX 0',
+        outstandingRevenue: 'UGX 0',
+        bookingsToday: 0,
+        pendingJobs: 0,
+        revenueMonth: 'UGX 0'
       };
     }
   },
 
   async getRevenueStats(): Promise<RevenueStats> {
     try {
-      // Actual revenue (from Completed and InProgress bookings)
-      const { data: actualBookings } = await supabase
+      const { data: bookings, error } = await supabase
         .from('bookings')
-        .select('total_amount')
-        .in('status', ['Completed', 'InProgress']);
+        .select('total_amount, created_at, status')
+        .eq('status', 'Completed');
 
-      const actualRevenue = actualBookings?.reduce((sum, booking) => 
-        sum + (booking.total_amount || 0), 0) || 0;
+      if (error) throw error;
 
-      // Projected revenue (include Scheduled bookings)
-      const { data: projectedBookings } = await supabase
-        .from('bookings')
-        .select('total_amount')
-        .in('status', ['Completed', 'InProgress', 'Scheduled', 'Draft']);
+      const totalRevenue = bookings?.reduce((sum, booking) => sum + (booking.total_amount || 0), 0) || 0;
 
-      const projectedRevenue = projectedBookings?.reduce((sum, booking) => 
-        sum + (booking.total_amount || 0), 0) || 0;
-
-      // Calculate percent change
-      const percentChange = actualRevenue > 0 ? 
-        ((projectedRevenue - actualRevenue) / actualRevenue * 100).toFixed(1) : '0';
-
-      // Get monthly breakdown
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const actualByMonth = Array(12).fill(0);
-      const projectedByMonth = Array(12).fill(0);
-
-      // Get all bookings for the current year
+      const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
-      const { data: yearBookings } = await supabase
-        .from('bookings')
-        .select('date, total_amount, status');
+      
+      const monthlyRevenue = bookings?.filter(booking => {
+        const bookingDate = new Date(booking.created_at);
+        return bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear;
+      }).reduce((sum, booking) => sum + (booking.total_amount || 0), 0) || 0;
 
-      // Process bookings by month
-      yearBookings?.forEach((booking) => {
-        const bookingDate = parse(booking.date, 'yyyy-MM-dd', new Date());
-        const bookingYear = bookingDate.getFullYear();
+      // Group by month for chart data
+      const revenueByMonth = bookings?.reduce((acc: any[], booking) => {
+        const date = new Date(booking.created_at);
+        const monthYear = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
         
-        // Only consider bookings from the current year
-        if (bookingYear === currentYear) {
-          const monthIndex = bookingDate.getMonth();
-          
-          // Add to projected revenue
-          projectedByMonth[monthIndex] += (booking.total_amount || 0);
-          
-          // Add to actual revenue if completed or in progress
-          if (booking.status === 'Completed' || booking.status === 'InProgress') {
-            actualByMonth[monthIndex] += (booking.total_amount || 0);
-          }
+        const existing = acc.find(item => item.month === monthYear);
+        if (existing) {
+          existing.revenue += booking.total_amount || 0;
+        } else {
+          acc.push({ month: monthYear, revenue: booking.total_amount || 0 });
         }
-      });
-
-      // Format currency
-      const formatter = new Intl.NumberFormat('en-UG', {
-        style: 'currency',
-        currency: 'UGX',
-        minimumFractionDigits: 0
-      });
+        return acc;
+      }, []) || [];
 
       return {
-        actual: formatter.format(actualRevenue),
-        projected: formatter.format(projectedRevenue),
-        percentChange: `${percentChange}%`,
-        breakdown: {
-          labels: months,
-          actual: actualByMonth,
-          projected: projectedByMonth
-        }
+        totalRevenue,
+        monthlyRevenue,
+        revenueByMonth: revenueByMonth.slice(-6) // Last 6 months
       };
     } catch (error) {
       console.error('Error fetching revenue stats:', error);
       return {
-        actual: 'UGX 0',
-        projected: 'UGX 0',
-        percentChange: '0%',
-        breakdown: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-          actual: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          projected: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        }
+        totalRevenue: 0,
+        monthlyRevenue: 0,
+        revenueByMonth: []
       };
+    }
+  },
+
+  async getUpcomingBookings() {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          booking_reference,
+          date,
+          time,
+          status,
+          customers (
+            name
+          )
+        `)
+        .eq('date', today)
+        .order('time', { ascending: true });
+
+      if (error) throw error;
+
+      return bookings?.map(booking => ({
+        id: booking.id,
+        customerName: booking.customers?.name || 'Unknown',
+        service: 'Service Details', // Could be enhanced to show actual services
+        time: booking.time,
+        status: booking.status
+      })) || [];
+    } catch (error) {
+      console.error('Error fetching upcoming bookings:', error);
+      return [];
     }
   }
 };
