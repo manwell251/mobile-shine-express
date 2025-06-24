@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Table, TableBody, TableCell, TableHead, 
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Edit, Trash2 } from 'lucide-react';
 import TechnicianAssignment from './TechnicianAssignment';
+import { supabase } from '@/integrations/supabase/client';
 
 interface JobsTableProps {
   jobs: JobWithDetails[];
